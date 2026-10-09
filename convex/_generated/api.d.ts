@@ -8,9 +8,24 @@
  * @module
  */
 
+import type * as appointmentSlots from "../appointmentSlots.js";
+import type * as appointments from "../appointments.js";
 import type * as auth from "../auth.js";
+import type * as businessClosures from "../businessClosures.js";
+import type * as businessHours from "../businessHours.js";
+import type * as businessSettings from "../businessSettings.js";
+import type * as businesses from "../businesses.js";
+import type * as counterOperations from "../counterOperations.js";
+import type * as counters from "../counters.js";
+import type * as deviceEvents from "../deviceEvents.js";
+import type * as devices from "../devices.js";
 import type * as http from "../http.js";
-import type * as myFunctions from "../myFunctions.js";
+import type * as lib_auth from "../lib/auth.js";
+import type * as lib_authorization from "../lib/authorization.js";
+import type * as notifications from "../notifications.js";
+import type * as queues from "../queues.js";
+import type * as services from "../services.js";
+import type * as userLocations from "../userLocations.js";
 
 import type {
   ApiFromModules,
@@ -19,9 +34,24 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  appointmentSlots: typeof appointmentSlots;
+  appointments: typeof appointments;
   auth: typeof auth;
+  businessClosures: typeof businessClosures;
+  businessHours: typeof businessHours;
+  businessSettings: typeof businessSettings;
+  businesses: typeof businesses;
+  counterOperations: typeof counterOperations;
+  counters: typeof counters;
+  deviceEvents: typeof deviceEvents;
+  devices: typeof devices;
   http: typeof http;
-  myFunctions: typeof myFunctions;
+  "lib/auth": typeof lib_auth;
+  "lib/authorization": typeof lib_authorization;
+  notifications: typeof notifications;
+  queues: typeof queues;
+  services: typeof services;
+  userLocations: typeof userLocations;
 }>;
 
 /**
