@@ -4,7 +4,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 
 export default function DiscoverPage() {
-  const businesses = useQuery(api.businesses.getAll, {});
+  const businesses = useQuery(api.business.data.getAll, {});
 
   if (businesses === undefined) {
     return <p>Loading businesses...</p>;

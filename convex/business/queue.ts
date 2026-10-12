@@ -1,7 +1,7 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
-import { requireBusinessOwner } from "./lib/authorization";
-import { Id } from "./_generated/dataModel";
+import { requireBusinessOwner } from "../lib/authorization";
+import { Id } from "../_generated/dataModel";
 
 // Shared validators
 const prerequisiteValidator = v.object({

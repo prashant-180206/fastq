@@ -14,15 +14,15 @@ export default function BusinessDetailPage({
   const { businessId } = use(params);
   const id = businessId as Id<"businesses">;
 
-  const business = useQuery(api.businesses.getById, {
+  const business = useQuery(api.business.data.getById, {
     businessId: id,
   });
 
-  const queues = useQuery(api.queue.getByBusiness, {
+  const queues = useQuery(api.business.queue.getByBusiness, {
     businessId: id,
   });
 
-  const services = useQuery(api.services.getByBusiness, {
+  const services = useQuery(api.business.services.getByBusiness, {
     businessId: id,
   });
 

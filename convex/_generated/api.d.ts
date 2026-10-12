@@ -8,15 +8,15 @@
  * @module
  */
 
-import type * as appointments from "../appointments.js";
 import type * as auth from "../auth.js";
-import type * as businesses from "../businesses.js";
+import type * as business_appointments from "../business/appointments.js";
+import type * as business_data from "../business/data.js";
+import type * as business_queue from "../business/queue.js";
+import type * as business_queueCapacity from "../business/queueCapacity.js";
+import type * as business_services from "../business/services.js";
 import type * as http from "../http.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_authorization from "../lib/authorization.js";
-import type * as queue from "../queue.js";
-import type * as queueCapacity from "../queueCapacity.js";
-import type * as services from "../services.js";
 
 import type {
   ApiFromModules,
@@ -25,15 +25,15 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  appointments: typeof appointments;
   auth: typeof auth;
-  businesses: typeof businesses;
+  "business/appointments": typeof business_appointments;
+  "business/data": typeof business_data;
+  "business/queue": typeof business_queue;
+  "business/queueCapacity": typeof business_queueCapacity;
+  "business/services": typeof business_services;
   http: typeof http;
   "lib/auth": typeof lib_auth;
   "lib/authorization": typeof lib_authorization;
-  queue: typeof queue;
-  queueCapacity: typeof queueCapacity;
-  services: typeof services;
 }>;
 
 /**

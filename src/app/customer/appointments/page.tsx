@@ -16,7 +16,7 @@ function titleCase(value: string) {
 }
 
 export default function CustomerAppointmentsPage() {
-  const appointments = useQuery(api.appointments.getMyAppointments, {});
+  const appointments = useQuery(api.business.appointments.getMyAppointments, {});
 
   if (appointments === undefined) {
     return <main className="p-6">Loading appointments...</main>;

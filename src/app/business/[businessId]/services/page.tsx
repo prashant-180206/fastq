@@ -13,12 +13,12 @@ export default function BusinessServicesPage({
 }) {
   const { businessId } = use(params);
   const businessDbId = businessId as Id<"businesses">;
-  const services = useQuery(api.services.getByBusiness, {
+  const services = useQuery(api.business.services.getByBusiness, {
     businessId: businessDbId,
   });
-  const createService = useMutation(api.services.create);
-  const updateService = useMutation(api.services.update);
-  const removeService = useMutation(api.services.remove);
+  const createService = useMutation(api.business.services.create);
+  const updateService = useMutation(api.business.services.update);
+  const removeService = useMutation(api.business.services.remove);
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");

@@ -3,12 +3,12 @@ import {
   mutation,
   query,
   type MutationCtx,
-} from "./_generated/server";
+} from "../_generated/server";
 import { v, type Infer } from "convex/values";
-import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
-import { requireUser } from "./lib/auth";
-import { requireBusinessOwner } from "./lib/authorization";
+import { internal } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
+import { requireUser } from "../lib/auth";
+import { requireBusinessOwner } from "../lib/authorization";
 
 const activeTokenStatuses = [
   "waiting",
@@ -359,7 +359,7 @@ export const callNext = mutation({
 
     await ctx.scheduler.runAt(
       graceDeadlineAt,
-      internal.queueCapacity.expireCalledToken,
+      internal.business.queueCapacity.expireCalledToken,
       {
         tokenId: nextToken._id,
         expectedDeadline: graceDeadlineAt,

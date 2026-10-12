@@ -18,7 +18,7 @@ function titleCase(value: string) {
 }
 
 export default function CustomerQueuePage() {
-  const tokens = useQuery(api.queueCapacity.getMyTokens, {});
+  const tokens = useQuery(api.business.queueCapacity.getMyTokens, {});
 
   if (tokens === undefined) {
     return <main className="p-6">Loading queue tokens...</main>;

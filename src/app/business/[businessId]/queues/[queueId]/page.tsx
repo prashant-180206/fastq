@@ -32,22 +32,22 @@ export default function BusinessQueueOperationsPage({ params }: PageProps) {
   const typedQueueId = queueId as Id<"queues">;
   const typedBusinessId = businessId as Id<"businesses">;
 
-  const queue = useQuery(api.queue.getById, {
+  const queue = useQuery(api.business.queue.getById, {
     queueId: typedQueueId,
   });
 
-  const services = useQuery(api.services.getByBusiness, {
+  const services = useQuery(api.business.services.getByBusiness, {
     businessId: typedBusinessId,
   });
 
-  const tokens = useQuery(api.queueCapacity.getActiveTokensByQueue, {
+  const tokens = useQuery(api.business.queueCapacity.getActiveTokensByQueue, {
     queueId: typedQueueId,
   });
 
-  const callNext = useMutation(api.queueCapacity.callNext);
-  const startServing = useMutation(api.queueCapacity.startServing);
-  const completeToken = useMutation(api.queueCapacity.completeToken);
-  const skipToken = useMutation(api.queueCapacity.skipToken);
+  const callNext = useMutation(api.business.queueCapacity.callNext);
+  const startServing = useMutation(api.business.queueCapacity.startServing);
+  const completeToken = useMutation(api.business.queueCapacity.completeToken);
+  const skipToken = useMutation(api.business.queueCapacity.skipToken);
 
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [error, setError] = useState("");

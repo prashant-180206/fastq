@@ -25,19 +25,19 @@ export default function JoinQueuePage({
     status: string;
   } | null>(null);
 
-  const business = useQuery(api.businesses.getPublicById, {
+  const business = useQuery(api.business.data.getPublicById, {
     businessId: id,
   });
 
-  const queues = useQuery(api.queue.getPublicByBusiness, {
+  const queues = useQuery(api.business.queue.getPublicByBusiness, {
     businessId: id,
   });
 
-  const services = useQuery(api.services.getPublicByBusiness, {
+  const services = useQuery(api.business.services.getPublicByBusiness, {
     businessId: id,
   });
 
-  const joinQueue = useMutation(api.queueCapacity.joinQueue);
+  const joinQueue = useMutation(api.business.queueCapacity.joinQueue);
 
   const selectedQueue = queues?.find((queue) => queue._id === queueId);
 

@@ -37,16 +37,16 @@ export default function BusinessSchedulePage({
   const id = businessId as Id<"businesses">;
   const [selectedDate, setSelectedDate] = useState(todayInIST());
 
-  const business = useQuery(api.businesses.getById, {
+  const business = useQuery(api.business.data.getById, {
     businessId: id,
   });
 
-  const appointments = useQuery(api.appointments.getByBusiness, {
+  const appointments = useQuery(api.business.appointments.getByBusiness, {
     businessId: id,
     date: selectedDate,
   });
 
-  const services = useQuery(api.services.getByBusiness, {
+  const services = useQuery(api.business.services.getByBusiness, {
     businessId: id,
   });
 

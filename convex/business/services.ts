@@ -1,6 +1,6 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
-import { requireBusinessOwner } from "./lib/authorization";
+import { requireBusinessOwner } from "../lib/authorization";
 
 const MIN_DURATION_MINUTES = 1;
 const MAX_DURATION_MINUTES = 480;

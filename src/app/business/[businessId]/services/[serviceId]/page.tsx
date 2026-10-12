@@ -101,13 +101,13 @@ export default function ServiceWorkspacePage({
   const businessDbId = businessId as Id<"businesses">;
   const serviceDbId = serviceId as Id<"services">;
 
-  const services = useQuery(api.services.getByBusiness, {
+  const services = useQuery(api.business.services.getByBusiness, {
     businessId: businessDbId,
   });
-  const allQueues = useQuery(api.queue.getByBusiness, {
+  const allQueues = useQuery(api.business.queue.getByBusiness, {
     businessId: businessDbId,
   });
-  const allAppointments = useQuery(api.appointments.getByBusiness, {
+  const allAppointments = useQuery(api.business.appointments.getByBusiness, {
     businessId: businessDbId,
   });
   const service = services?.find((item) => item._id === serviceDbId);
@@ -118,17 +118,17 @@ export default function ServiceWorkspacePage({
       (appointment) => appointment.serviceId === serviceDbId,
     ) ?? [];
 
-  const updateService = useMutation(api.services.update);
-  const createQueue = useMutation(api.queue.create);
-  const updateQueue = useMutation(api.queue.update);
-  const removeQueue = useMutation(api.queue.remove);
-  const callNext = useMutation(api.queueCapacity.callNext);
-  const startServing = useMutation(api.queueCapacity.startServing);
-  const completeToken = useMutation(api.queueCapacity.completeToken);
-  const skipToken = useMutation(api.queueCapacity.skipToken);
-  const checkInAppointment = useMutation(api.appointments.checkIn);
-  const completeAppointment = useMutation(api.appointments.complete);
-  const markNoShow = useMutation(api.appointments.markNoShow);
+  const updateService = useMutation(api.business.services.update);
+  const createQueue = useMutation(api.business.queue.create);
+  const updateQueue = useMutation(api.business.queue.update);
+  const removeQueue = useMutation(api.business.queue.remove);
+  const callNext = useMutation(api.business.queueCapacity.callNext);
+  const startServing = useMutation(api.business.queueCapacity.startServing);
+  const completeToken = useMutation(api.business.queueCapacity.completeToken);
+  const skipToken = useMutation(api.business.queueCapacity.skipToken);
+  const checkInAppointment = useMutation(api.business.appointments.checkIn);
+  const completeAppointment = useMutation(api.business.appointments.complete);
+  const markNoShow = useMutation(api.business.appointments.markNoShow);
 
   const [tab, setTab] = useState<Tab>("overview");
   const [error, setError] = useState("");
@@ -157,12 +157,12 @@ export default function ServiceWorkspacePage({
   const selectedQueue =
     queues.find((queue) => queue._id === selectedQueueId) ?? queues[0];
   const tokens = useQuery(
-    api.queueCapacity.getActiveTokensByQueue,
+    api.business.queueCapacity.getActiveTokensByQueue,
     selectedQueue ? { queueId: selectedQueue._id as Id<"queues"> } : "skip",
   );
 
   const availability = useQuery(
-    api.appointments.getAvailableSlots,
+    api.business.appointments.getAvailableSlots,
     service?.appointmentsEnabled
       ? { businessId: businessDbId, serviceId: serviceDbId, date }
       : "skip",

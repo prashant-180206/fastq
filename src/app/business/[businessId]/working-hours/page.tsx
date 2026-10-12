@@ -44,11 +44,11 @@ export default function WorkingHoursPage({
 }) {
   const { businessId } = use(params);
 
-  const business = useQuery(api.businesses.getById, {
+  const business = useQuery(api.business.data.getById, {
     businessId: businessId as Id<"businesses">,
   });
 
-  const saveHours = useMutation(api.businesses.updateBusinessHours);
+  const saveHours = useMutation(api.business.data.updateBusinessHours);
 
   const [hours, setHours] = useState<BusinessDay[]>(defaultHours);
   const [initialized, setInitialized] = useState(false);

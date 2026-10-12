@@ -26,11 +26,11 @@ function titleCase(value: string) {
 export default function CustomerAppointmentDetailPage({ params }: PageProps) {
   const { appointmentId } = use(params);
 
-  const appointment = useQuery(api.appointments.getMyAppointmentById, {
+  const appointment = useQuery(api.business.appointments.getMyAppointmentById, {
     appointmentId: appointmentId as Id<"appointments">,
   });
 
-  const cancelAppointment = useMutation(api.appointments.cancel);
+  const cancelAppointment = useMutation(api.business.appointments.cancel);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");

@@ -3,11 +3,11 @@ import {
   query,
   type MutationCtx,
   type QueryCtx,
-} from "./_generated/server";
+} from "../_generated/server";
 import { v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
-import { requireUser } from "./lib/auth";
-import { requireBusinessOwner } from "./lib/authorization";
+import type { Id } from "../_generated/dataModel";
+import { requireUser } from "../lib/auth";
+import { requireBusinessOwner } from "../lib/authorization";
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 

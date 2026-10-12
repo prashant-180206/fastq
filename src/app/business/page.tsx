@@ -5,7 +5,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 
 export default function BusinessesPage() {
-  const businesses = useQuery(api.businesses.getMine, {});
+  const businesses = useQuery(api.business.data.getMine, {});
 
   return (
     <main className="mx-auto max-w-4xl space-y-6 p-6">

@@ -30,12 +30,12 @@ export default function CustomerQueueTokenPage({ params }: PageProps) {
   const { tokenId } = use(params);
   const router = useRouter();
 
-  const token = useQuery(api.queueCapacity.getMyTokenById, {
+  const token = useQuery(api.business.queueCapacity.getMyTokenById, {
     tokenId: tokenId as Id<"queueTokens">,
   });
 
-  const checkIn = useMutation(api.queueCapacity.checkInToken);
-  const cancel = useMutation(api.queueCapacity.cancelToken);
+  const checkIn = useMutation(api.business.queueCapacity.checkInToken);
+  const cancel = useMutation(api.business.queueCapacity.cancelToken);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");

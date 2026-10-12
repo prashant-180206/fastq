@@ -38,16 +38,16 @@ export default function BookAppointmentPage({
     scheduledEnd: number;
   } | null>(null);
 
-  const business = useQuery(api.businesses.getPublicById, {
+  const business = useQuery(api.business.data.getPublicById, {
     businessId: id,
   });
 
-  const services = useQuery(api.services.getPublicByBusiness, {
+  const services = useQuery(api.business.services.getPublicByBusiness, {
     businessId: id,
   });
 
   const slots = useQuery(
-    api.appointments.getAvailableSlots,
+    api.business.appointments.getAvailableSlots,
     serviceId
       ? {
           businessId: id,
@@ -57,7 +57,7 @@ export default function BookAppointmentPage({
       : "skip",
   );
 
-  const book = useMutation(api.appointments.book);
+  const book = useMutation(api.business.appointments.book);
 
   const selectedService = services?.find(
     (service) => service._id === serviceId,

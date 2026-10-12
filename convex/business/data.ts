@@ -1,7 +1,7 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
-import { requireUser } from "./lib/auth";
-import { requireBusinessOwner } from "./lib/authorization";
+import { requireUser } from "../lib/auth";
+import { requireBusinessOwner } from "../lib/authorization";
 
 // Shared validator for weekly business hours.
 const timeSlot = v.object({

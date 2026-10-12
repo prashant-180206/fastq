@@ -30,17 +30,17 @@ export default function BusinessQueuesPage({
   const { businessId } = use(params);
   const id = businessId as Id<"businesses">;
 
-  const queues = useQuery(api.queue.getByBusiness, {
+  const queues = useQuery(api.business.queue.getByBusiness, {
     businessId: id,
   });
 
-  const services = useQuery(api.services.getByBusiness, {
+  const services = useQuery(api.business.services.getByBusiness, {
     businessId: id,
   });
 
-  const createQueue = useMutation(api.queue.create);
-  const updateQueue = useMutation(api.queue.update);
-  const removeQueue = useMutation(api.queue.remove);
+  const createQueue = useMutation(api.business.queue.create);
+  const updateQueue = useMutation(api.business.queue.update);
+  const removeQueue = useMutation(api.business.queue.remove);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [serviceId, setServiceId] = useState("");

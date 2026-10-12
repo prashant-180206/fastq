@@ -40,18 +40,18 @@ export default function BusinessAppointmentsPage({
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const appointments = useQuery(api.appointments.getByBusiness, {
+  const appointments = useQuery(api.business.appointments.getByBusiness, {
     businessId: id,
     date: selectedDate,
   });
 
-  const services = useQuery(api.services.getByBusiness, {
+  const services = useQuery(api.business.services.getByBusiness, {
     businessId: id,
   });
 
-  const checkIn = useMutation(api.appointments.checkIn);
-  const complete = useMutation(api.appointments.complete);
-  const markNoShow = useMutation(api.appointments.markNoShow);
+  const checkIn = useMutation(api.business.appointments.checkIn);
+  const complete = useMutation(api.business.appointments.complete);
+  const markNoShow = useMutation(api.business.appointments.markNoShow);
 
   const serviceName = (serviceId: Id<"services">) =>
     services?.find((service) => service._id === serviceId)?.name ?? "Service";

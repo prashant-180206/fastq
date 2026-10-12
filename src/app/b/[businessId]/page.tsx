@@ -65,15 +65,15 @@ export default function PublicBusinessPage() {
   const params = useParams<{ businessId: string }>();
   const businessId = params.businessId as Id<"businesses">;
 
-  const business = useQuery(api.businesses.getPublicById, {
+  const business = useQuery(api.business.data.getPublicById, {
     businessId,
   });
 
-  const services = useQuery(api.services.getPublicByBusiness, {
+  const services = useQuery(api.business.services.getPublicByBusiness, {
     businessId,
   });
 
-  const queues = useQuery(api.queue.getPublicByBusiness, {
+  const queues = useQuery(api.business.queue.getPublicByBusiness, {
     businessId,
   });
 

@@ -18,8 +18,8 @@ function titleCase(value: string) {
 }
 
 export default function CustomerDashboardPage() {
-  const tokens = useQuery(api.queueCapacity.getMyTokens, {});
-  const appointments = useQuery(api.appointments.getMyAppointments, {});
+  const tokens = useQuery(api.business.queueCapacity.getMyTokens, {});
+  const appointments = useQuery(api.business.appointments.getMyAppointments, {});
 
   if (tokens === undefined || appointments === undefined) {
     return <main className="p-6">Loading your dashboard...</main>;

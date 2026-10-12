@@ -8,7 +8,7 @@ import { api } from "@/../convex/_generated/api";
 
 export default function NewBusinessPage() {
   const router = useRouter();
-  const createBusiness = useMutation(api.businesses.create);
+  const createBusiness = useMutation(api.business.data.create);
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
