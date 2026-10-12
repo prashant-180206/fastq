@@ -1,4 +1,3 @@
-
 "use client";
 
 import { use, useState, type FormEvent } from "react";
@@ -51,8 +50,7 @@ export default function BusinessQueuesPage({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const activeServices =
-    services?.filter((service) => service.isActive) ?? [];
+  const activeServices = services?.filter((service) => service.isActive) ?? [];
 
   function resetForm() {
     setEditingId(null);
@@ -72,14 +70,9 @@ export default function BusinessQueuesPage({
     setError("");
   }
 
-  function updatePrerequisite(
-    index: number,
-    patch: Partial<Prerequisite>
-  ) {
+  function updatePrerequisite(index: number, patch: Partial<Prerequisite>) {
     setPrerequisites((current) =>
-      current.map((item, i) =>
-        i === index ? { ...item, ...patch } : item
-      )
+      current.map((item, i) => (i === index ? { ...item, ...patch } : item)),
     );
   }
 
@@ -132,33 +125,23 @@ export default function BusinessQueuesPage({
 
       resetForm();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Could not save queue."
-      );
+      setError(err instanceof Error ? err.message : "Could not save queue.");
     } finally {
       setSaving(false);
     }
   }
 
-  async function changeStatus(
-    queueId: Id<"queues">,
-    status: QueueStatus
-  ) {
+  async function changeStatus(queueId: Id<"queues">, status: QueueStatus) {
     setError("");
 
     try {
       await updateQueue({ queueId, status });
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Could not update status."
-      );
+      setError(err instanceof Error ? err.message : "Could not update status.");
     }
   }
 
-  async function deleteQueue(
-    queueId: Id<"queues">,
-    queueName: string
-  ) {
+  async function deleteQueue(queueId: Id<"queues">, queueName: string) {
     if (!window.confirm(`Delete "${queueName}" permanently?`)) return;
 
     setError("");
@@ -170,9 +153,7 @@ export default function BusinessQueuesPage({
         resetForm();
       }
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Could not delete queue."
-      );
+      setError(err instanceof Error ? err.message : "Could not delete queue.");
     }
   }
 
@@ -210,9 +191,7 @@ export default function BusinessQueuesPage({
       )}
 
       <section className="space-y-4">
-        <h2 className="font-semibold">
-          Existing queues ({queues.length})
-        </h2>
+        <h2 className="font-semibold">Existing queues ({queues.length})</h2>
 
         {queues.length === 0 ? (
           <p className="rounded-xl border border-dashed p-6 text-sm text-gray-500">
@@ -269,6 +248,13 @@ export default function BusinessQueuesPage({
                         </ul>
                       )}
                     </div>
+
+                    <Link
+                      href={`/business/${businessId}/queues/${queue._id}`}
+                      className="rounded-lg bg-black px-3 py-1.5 text-sm text-white"
+                    >
+                      Live operations
+                    </Link>
 
                     <div className="flex flex-wrap gap-2">
                       <button
@@ -358,8 +344,7 @@ export default function BusinessQueuesPage({
                 <option value="">Select a service</option>
                 {services
                   .filter(
-                    (service) =>
-                      service.isActive || service._id === serviceId
+                    (service) => service.isActive || service._id === serviceId,
                   )
                   .map((service) => (
                     <option key={service._id} value={service._id}>
@@ -409,9 +394,7 @@ export default function BusinessQueuesPage({
 
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
-                <h3 className="text-sm font-medium">
-                  Customer prerequisites
-                </h3>
+                <h3 className="text-sm font-medium">Customer prerequisites</h3>
                 <button
                   type="button"
                   onClick={() =>
@@ -485,7 +468,7 @@ export default function BusinessQueuesPage({
                       type="button"
                       onClick={() =>
                         setPrerequisites((current) =>
-                          current.filter((_, i) => i !== index)
+                          current.filter((_, i) => i !== index),
                         )
                       }
                       className="text-sm text-red-600 underline"

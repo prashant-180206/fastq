@@ -597,3 +597,37 @@ export const getMyTokenById = query({
     return token;
   },
 });
+
+/**
+ * Get active tokens for a queue managed by the authenticated business owner.
+ */
+export const getActiveTokensByQueue = query({
+  args: {
+    queueId: v.id("queues"),
+  },
+
+  handler: async (ctx, args) => {
+    const queue = await ctx.db.get(args.queueId);
+
+    if (!queue) {
+      throw new Error("Queue not found.");
+    }
+
+    await requireBusinessOwner(ctx, queue.businessId);
+
+    const statuses = ["waiting", "called", "checked_in", "serving"] as const;
+
+    const groups = await Promise.all(
+      statuses.map((status) =>
+        ctx.db
+          .query("queueTokens")
+          .withIndex("by_queue_and_status", (q) =>
+            q.eq("queueId", queue._id).eq("status", status),
+          )
+          .collect(),
+      ),
+    );
+
+    return groups.flat().sort((a, b) => a.joinedAt - b.joinedAt);
+  },
+});
