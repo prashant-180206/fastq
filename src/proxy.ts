@@ -1,0 +1,9 @@
+import { convexAuthNextjsMiddleware } from "@convex-dev/auth/nextjs/server";
+
+export const proxy = convexAuthNextjsMiddleware(undefined, {
+  verbose: true,
+});
+
+export const config = {
+  matcher: ["/((?!.*\\..*|_next).*)", "/", "/(api|trpc)(.*)"],
+};
