@@ -37,7 +37,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
         flow: mode,
       });
 
-      router.push("/business/new");
+      router.push("/discover");
     } catch (err) {
       setError(
         err instanceof Error

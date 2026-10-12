@@ -87,6 +87,7 @@ export default defineSchema({
       v.literal("paused"),
       v.literal("closed"),
     ),
+    gracePeriodMinutes: v.optional(v.number()),
 
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -143,4 +144,68 @@ export default defineSchema({
     .index("by_service_and_start", ["serviceId", "scheduledStart"])
     .index("by_customer", ["userId"])
     .index("by_business_and_status", ["businessId", "status"]),
+
+  queueTokens: defineTable({
+    // Relationships
+    businessId: v.id("businesses"),
+    queueId: v.id("queues"),
+    serviceId: v.id("services"),
+    customerId: v.id("users"),
+
+    // Customer-facing ticket number
+    tokenNumber: v.number(),
+
+    // Queue lifecycle
+    status: v.union(
+      v.literal("waiting"),
+      v.literal("called"),
+      v.literal("checked_in"),
+      v.literal("serving"),
+      v.literal("completed"),
+      v.literal("cancelled"),
+      v.literal("no_show"),
+      v.literal("skipped"),
+      v.literal("expired"),
+    ),
+
+    // Timing
+    joinedAt: v.number(),
+    calledAt: v.optional(v.number()),
+    checkedInAt: v.optional(v.number()),
+    serviceStartedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    cancelledAt: v.optional(v.number()),
+    noShowAt: v.optional(v.number()),
+    skippedAt: v.optional(v.number()),
+    expiredAt: v.optional(v.number()),
+
+    // Grace period: snapshot the policy at token creation
+    gracePeriodMinutes: v.number(),
+    graceDeadlineAt: v.optional(v.number()),
+
+    // Hard validity deadline, independent of the grace period
+    expiresAt: v.optional(v.number()),
+
+    // Optional operational information
+    estimatedWaitMinutes: v.optional(v.number()),
+    customerNote: v.optional(v.string()),
+
+    // Snapshot of customer acknowledgements at joining time
+    acknowledgedPrerequisites: v.array(
+      v.object({
+        prerequisiteId: v.string(),
+        acknowledgedAt: v.number(),
+      }),
+    ),
+
+    updatedAt: v.number(),
+  })
+    .index("by_queue", ["queueId"])
+    .index("by_queue_and_status", ["queueId", "status"])
+    .index("by_queue_and_token_number", ["queueId", "tokenNumber"])
+    .index("by_customer", ["customerId"])
+    .index("by_customer_and_status", ["customerId", "status"])
+    .index("by_business_and_joined_at", ["businessId", "joinedAt"])
+    .index("by_status_and_grace_deadline", ["status", "graceDeadlineAt"])
+    .index("by_status_and_expiry", ["status", "expiresAt"]),
 });

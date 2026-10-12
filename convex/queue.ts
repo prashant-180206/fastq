@@ -267,3 +267,54 @@ export const remove = mutation({
     return { success: true };
   },
 });
+
+// USER FUNCTIONS PUBLIC
+
+export const getPublicByBusiness = query({
+  args: {
+    businessId: v.id("businesses"),
+  },
+  handler: async (ctx, args) => {
+    const business = await ctx.db.get(args.businessId);
+
+    if (!business || business.status !== "active") {
+      return [];
+    }
+
+    const queues = await ctx.db
+      .query("queues")
+      .withIndex("by_business", (q) => q.eq("businessId", args.businessId))
+      .collect();
+
+    const publicQueues = [];
+
+    for (const queue of queues) {
+      if (queue.status !== "active") {
+        continue;
+      }
+
+      const service = await ctx.db.get(queue.serviceId);
+
+      if (
+        !service ||
+        service.businessId !== args.businessId ||
+        !service.isActive ||
+        !service.queueEnabled
+      ) {
+        continue;
+      }
+
+      publicQueues.push({
+        _id: queue._id,
+        businessId: queue.businessId,
+        serviceId: queue.serviceId,
+        name: queue.name,
+        description: queue.description,
+        prerequisites: queue.prerequisites,
+        status: queue.status,
+      });
+    }
+
+    return publicQueues.sort((a, b) => a.name.localeCompare(b.name));
+  },
+});

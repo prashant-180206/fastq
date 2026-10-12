@@ -1,4 +1,3 @@
-
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { requireBusinessOwner } from "./lib/authorization";
@@ -13,7 +12,7 @@ const validateService = (durationMinutes: number) => {
     durationMinutes > MAX_DURATION_MINUTES
   ) {
     throw new Error(
-      `Service duration must be between ${MIN_DURATION_MINUTES} and ${MAX_DURATION_MINUTES} whole minutes.`
+      `Service duration must be between ${MIN_DURATION_MINUTES} and ${MAX_DURATION_MINUTES} whole minutes.`,
     );
   }
 };
@@ -42,9 +41,7 @@ export const create = mutation({
     validateService(args.durationMinutes);
 
     if (!args.queueEnabled && !args.appointmentsEnabled) {
-      throw new Error(
-        "Enable queues, appointments, or both for this service."
-      );
+      throw new Error("Enable queues, appointments, or both for this service.");
     }
 
     const now = Date.now();
@@ -93,9 +90,7 @@ export const getByBusiness = query({
 
     return await ctx.db
       .query("services")
-      .withIndex("by_business", (q) =>
-        q.eq("businessId", args.businessId)
-      )
+      .withIndex("by_business", (q) => q.eq("businessId", args.businessId))
       .collect();
   },
 });
@@ -112,9 +107,7 @@ export const getActiveByBusiness = query({
     return await ctx.db
       .query("services")
       .withIndex("by_business_and_active", (q) =>
-        q
-          .eq("businessId", args.businessId)
-          .eq("isActive", true)
+        q.eq("businessId", args.businessId).eq("isActive", true),
       )
       .collect();
   },
@@ -141,21 +134,16 @@ export const update = mutation({
 
     await requireBusinessOwner(ctx, service.businessId);
 
-    const nextQueueEnabled =
-      args.queueEnabled ?? service.queueEnabled;
+    const nextQueueEnabled = args.queueEnabled ?? service.queueEnabled;
 
     const nextAppointmentsEnabled =
       args.appointmentsEnabled ?? service.appointmentsEnabled;
 
     const nextIsActive = args.isActive ?? service.isActive;
 
-    if (
-      nextIsActive &&
-      !nextQueueEnabled &&
-      !nextAppointmentsEnabled
-    ) {
+    if (nextIsActive && !nextQueueEnabled && !nextAppointmentsEnabled) {
       throw new Error(
-        "An active service must support queues, appointments, or both."
+        "An active service must support queues, appointments, or both.",
       );
     }
 
@@ -226,33 +214,64 @@ export const remove = mutation({
     // Prevent deleting a service referenced by a queue.
     const queues = await ctx.db
       .query("queues")
-      .withIndex("by_business", (q) =>
-        q.eq("businessId", service.businessId)
-      )
+      .withIndex("by_business", (q) => q.eq("businessId", service.businessId))
       .collect();
 
     if (queues.some((queue) => queue.serviceId === service._id)) {
       throw new Error(
-        "This service is assigned to a queue. Remove or reassign the queue first."
+        "This service is assigned to a queue. Remove or reassign the queue first.",
       );
     }
 
     // Prevent deleting a service referenced by appointments.
     const appointments = await ctx.db
       .query("appointments")
-      .withIndex("by_service_and_start", (q) =>
-        q.eq("serviceId", service._id)
-      )
+      .withIndex("by_service_and_start", (q) => q.eq("serviceId", service._id))
       .collect();
 
     if (appointments.length > 0) {
       throw new Error(
-        "This service has appointment records. Deactivate it instead to preserve booking history."
+        "This service has appointment records. Deactivate it instead to preserve booking history.",
       );
     }
 
     await ctx.db.delete(service._id);
 
     return { success: true };
+  },
+});
+
+export const getPublicByBusiness = query({
+  args: {
+    businessId: v.id("businesses"),
+  },
+  handler: async (ctx, args) => {
+    const business = await ctx.db.get(args.businessId);
+
+    if (!business || business.status !== "active") {
+      return [];
+    }
+
+    const services = await ctx.db
+      .query("services")
+      .withIndex("by_business", (q) => q.eq("businessId", args.businessId))
+      .collect();
+
+    return services
+      .filter(
+        (service) =>
+          service.isActive &&
+          (service.queueEnabled || service.appointmentsEnabled),
+      )
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((service) => ({
+        _id: service._id,
+        businessId: service.businessId,
+        name: service.name,
+        description: service.description,
+        durationMinutes: service.durationMinutes,
+        queueEnabled: service.queueEnabled,
+        appointmentsEnabled: service.appointmentsEnabled,
+      }));
   },
 });

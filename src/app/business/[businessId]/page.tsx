@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -36,15 +35,12 @@ export default function BusinessDetailPage({
   }
 
   const configuredDays = business.businessHours?.filter(
-    (day) => day.isOpen
+    (day) => day.isOpen,
   ).length;
 
   return (
     <main className="mx-auto max-w-4xl space-y-6 p-6">
-      <Link
-        href="/business"
-        className="text-sm text-gray-500 hover:underline"
-      >
+      <Link href="/business" className="text-sm text-gray-500 hover:underline">
         ← All businesses
       </Link>
 
@@ -58,9 +54,7 @@ export default function BusinessDetailPage({
       <section className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-xl border p-5">
           <p className="text-sm text-gray-500">Status</p>
-          <p className="mt-2 font-medium capitalize">
-            {business.status}
-          </p>
+          <p className="mt-2 font-medium capitalize">{business.status}</p>
         </div>
 
         <div className="rounded-xl border p-5">
@@ -80,9 +74,7 @@ export default function BusinessDetailPage({
 
         <div className="rounded-xl border p-5">
           <p className="text-sm text-gray-500">Contact email</p>
-          <p className="mt-2">
-            {business.contactEmail || "Not provided"}
-          </p>
+          <p className="mt-2">{business.contactEmail || "Not provided"}</p>
         </div>
 
         <div className="rounded-xl border p-5">
@@ -113,8 +105,8 @@ export default function BusinessDetailPage({
           <p className="text-sm text-gray-500">Loading services...</p>
         ) : services.length === 0 ? (
           <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">
-            No services created yet. Add a service before assigning it
-            to queues or enabling appointments.
+            No services created yet. Add a service before assigning it to queues
+            or enabling appointments.
           </p>
         ) : (
           <div className="divide-y">
@@ -142,12 +134,11 @@ export default function BusinessDetailPage({
                         Appointments enabled
                       </span>
                     )}
-                    {!service.queueEnabled &&
-                      !service.appointmentsEnabled && (
-                        <span className="rounded-full border px-2 py-1">
-                          No booking method
-                        </span>
-                      )}
+                    {!service.queueEnabled && !service.appointmentsEnabled && (
+                      <span className="rounded-full border px-2 py-1">
+                        No booking method
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -220,6 +211,29 @@ export default function BusinessDetailPage({
           className="mt-4 inline-block rounded-lg border px-4 py-2 text-sm"
         >
           Manage working hours
+        </Link>
+      </section>
+
+      {/* Appointments and schedule */}
+      <section className="grid gap-4 sm:grid-cols-2">
+        <Link
+          href={`/business/${business._id}/appointments`}
+          className="rounded-xl border p-5 transition hover:bg-gray-50"
+        >
+          <h2 className="font-semibold">Appointments →</h2>
+          <p className="mt-2 text-sm text-gray-500">
+            View bookings, check customers in, and manage visit statuses.
+          </p>
+        </Link>
+
+        <Link
+          href={`/business/${business._id}/schedule`}
+          className="rounded-xl border p-5 transition hover:bg-gray-50"
+        >
+          <h2 className="font-semibold">Daily schedule →</h2>
+          <p className="mt-2 text-sm text-gray-500">
+            Review operating hours and the day's appointment timeline.
+          </p>
         </Link>
       </section>
     </main>

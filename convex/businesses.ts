@@ -5,7 +5,7 @@ import { requireBusinessOwner } from "./lib/authorization";
 
 // Shared validator for weekly business hours.
 const timeSlot = v.object({
-  open: v.string(),  // "09:00" — 24-hour HH:mm
+  open: v.string(), // "09:00" — 24-hour HH:mm
   close: v.string(), // "17:00" — 24-hour HH:mm
 });
 
@@ -17,7 +17,7 @@ const businessDay = v.object({
     v.literal("thursday"),
     v.literal("friday"),
     v.literal("saturday"),
-    v.literal("sunday")
+    v.literal("sunday"),
   ),
   isOpen: v.boolean(),
   slots: v.array(timeSlot),
@@ -63,10 +63,7 @@ export const getById = query({
   },
 
   handler: async (ctx, args) => {
-    const { business } = await requireBusinessOwner(
-      ctx,
-      args.businessId
-    );
+    const { business } = await requireBusinessOwner(ctx, args.businessId);
 
     return business;
   },
@@ -81,9 +78,7 @@ export const getMine = query({
 
     return await ctx.db
       .query("businesses")
-      .withIndex("by_owner", (q) =>
-        q.eq("ownerId", user._id)
-      )
+      .withIndex("by_owner", (q) => q.eq("ownerId", user._id))
       .collect();
   },
 });
@@ -153,32 +148,26 @@ export const updateBusinessHours = mutation({
     const days = args.businessHours.map((item) => item.day);
 
     if (new Set(days).size !== days.length) {
-      throw new Error(
-        "Business hours cannot contain duplicate days."
-      );
+      throw new Error("Business hours cannot contain duplicate days.");
     }
 
     // Validate the time format and ensure each slot has
     // a positive duration within the same calendar day.
     for (const day of args.businessHours) {
       if (!day.isOpen && day.slots.length > 0) {
-        throw new Error(
-          `Closed day "${day.day}" cannot contain time slots.`
-        );
+        throw new Error(`Closed day "${day.day}" cannot contain time slots.`);
       }
 
       if (day.isOpen && day.slots.length === 0) {
         throw new Error(
-          `Open day "${day.day}" must contain at least one time slot.`
+          `Open day "${day.day}" must contain at least one time slot.`,
         );
       }
 
       const slots = day.slots.map((slot) => {
         const parseTime = (time: string) => {
           if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
-            throw new Error(
-              `Invalid time "${time}". Use HH:mm format.`
-            );
+            throw new Error(`Invalid time "${time}". Use HH:mm format.`);
           }
 
           const [hours, minutes] = time.split(":").map(Number);
@@ -190,7 +179,7 @@ export const updateBusinessHours = mutation({
 
         if (open >= close) {
           throw new Error(
-            `Closing time must be later than opening time on ${day.day}.`
+            `Closing time must be later than opening time on ${day.day}.`,
           );
         }
 
@@ -202,9 +191,7 @@ export const updateBusinessHours = mutation({
 
       for (let i = 1; i < slots.length; i++) {
         if (slots[i].open < slots[i - 1].close) {
-          throw new Error(
-            `Time slots cannot overlap on ${day.day}.`
-          );
+          throw new Error(`Time slots cannot overlap on ${day.day}.`);
         }
       }
     }
@@ -232,3 +219,60 @@ export const remove = mutation({
     return { success: true };
   },
 });
+
+// GET ALL BUSINESSES FOR CUSTOMERS TO SEE
+
+export const getAll = query({
+  args: {},
+  handler: async (ctx) => {
+    const businesses = await ctx.db.query("businesses").collect();
+
+    const activeBusinesses = businesses
+      .filter((business) => business.status === "active")
+      .sort((a, b) => b.createdAt - a.createdAt);
+
+    return Promise.all(
+      activeBusinesses.map(async (business) => ({
+        _id: business._id,
+        name: business.name,
+        description: business.description,
+        logoUrl: business.logoStorageId
+          ? await ctx.storage.getUrl(business.logoStorageId)
+          : null,
+        contactEmail: business.contactEmail,
+        phone: business.phone,
+        businessHours: business.businessHours,
+        createdAt: business.createdAt,
+      })),
+    );
+  },
+});
+
+export const getPublicById = query({
+  args: {
+    businessId: v.id("businesses"),
+  },
+  handler: async (ctx, args) => {
+    const business = await ctx.db.get(args.businessId);
+
+    if (!business || business.status !== "active") {
+      return null;
+    }
+
+    const logoUrl = business.logoStorageId
+      ? await ctx.storage.getUrl(business.logoStorageId)
+      : null;
+
+    return {
+      _id: business._id,
+      name: business.name,
+      description: business.description,
+      logoUrl,
+      contactEmail: business.contactEmail,
+      phone: business.phone,
+      businessHours: business.businessHours,
+      createdAt: business.createdAt,
+    };
+  },
+});
+
