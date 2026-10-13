@@ -25,8 +25,16 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { BUSINESS_TYPES, type BusinessType } from "@/lib/business-type";
 import { ArrowLeft01Icon, Store01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "cn";
@@ -36,9 +44,12 @@ export default function NewBusinessPage() {
   const createBusiness = useMutation(api.business.data.create);
 
   const [name, setName] = useState("");
+  const [type, setType] = useState<BusinessType>("business");
   const [description, setDescription] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -47,12 +58,29 @@ export default function NewBusinessPage() {
     setError("");
     setSaving(true);
 
+    const hasLatitude = latitude.trim() !== "";
+    const hasLongitude = longitude.trim() !== "";
+
+    if (hasLatitude !== hasLongitude) {
+      setError("Provide both latitude and longitude, or leave both empty.");
+      setSaving(false);
+      return;
+    }
+
     try {
       const businessId = await createBusiness({
         name,
+        type,
         description: description || undefined,
         contactEmail: contactEmail || undefined,
         phone: phone || undefined,
+        location:
+          hasLatitude && hasLongitude
+            ? {
+                latitude: Number(latitude),
+                longitude: Number(longitude),
+              }
+            : undefined,
       });
 
       router.push(`/business/${businessId}`);
@@ -124,6 +152,30 @@ export default function NewBusinessPage() {
               </Field>
 
               <Field>
+                <FieldLabel htmlFor="business-type">Type</FieldLabel>
+                <Select
+                  value={type}
+                  onValueChange={(value) =>
+                    setType((value as BusinessType) ?? "business")
+                  }
+                >
+                  <SelectTrigger id="business-type" className="w-full">
+                    <SelectValue placeholder="Select a type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BUSINESS_TYPES.map((entry) => (
+                      <SelectItem key={entry.value} value={entry.value}>
+                        {entry.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldDescription>
+                  The category shown when customers discover your business.
+                </FieldDescription>
+              </Field>
+
+              <Field>
                 <FieldLabel htmlFor="description">Description</FieldLabel>
                 <Textarea
                   id="description"
@@ -158,6 +210,41 @@ export default function NewBusinessPage() {
                   placeholder="+91 98765 43210"
                 />
               </Field>
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field>
+                  <FieldLabel htmlFor="latitude">Latitude</FieldLabel>
+                  <Input
+                    id="latitude"
+                    type="number"
+                    step="any"
+                    min="-90"
+                    max="90"
+                    inputMode="decimal"
+                    value={latitude}
+                    onChange={(event) => setLatitude(event.target.value)}
+                    placeholder="e.g. 28.6139"
+                  />
+                </Field>
+
+                <Field>
+                  <FieldLabel htmlFor="longitude">Longitude</FieldLabel>
+                  <Input
+                    id="longitude"
+                    type="number"
+                    step="any"
+                    min="-180"
+                    max="180"
+                    inputMode="decimal"
+                    value={longitude}
+                    onChange={(event) => setLongitude(event.target.value)}
+                    placeholder="e.g. 77.2090"
+                  />
+                </Field>
+              </div>
+              <FieldDescription>
+                Optional WGS84 coordinates for directions and nearby discovery.
+              </FieldDescription>
 
               {error ? (
                 <Alert variant="destructive">

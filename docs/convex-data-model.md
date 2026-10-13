@@ -10,6 +10,8 @@ Schema lives in `convex/schema.ts` (`defineSchema`). Auth tables (`authTables`) 
 
 ### businesses
 - `ownerId` (user), `name`, `description`, `logoStorageId`, `contactEmail`, `phone`, `businessHours` (weekly schedule: per-day open/close slots, `isOpen`).
+- `type`: `business` | `government_office` | `restaurant` | `salon` | `other` (optional; default `business`).
+- `location`: optional `{ latitude, longitude }` (WGS84) — used for directions and nearby discovery.
 - `status`: `active` | `archived`. `createdAt`/`updatedAt`.
 - Index: `by_owner`.
 

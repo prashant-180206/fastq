@@ -53,6 +53,25 @@ export default defineSchema({
     contactEmail: v.optional(v.string()),
     phone: v.optional(v.string()),
 
+    // Business category used for discovery and filtering.
+    type: v.optional(
+      v.union(
+        v.literal("business"),
+        v.literal("government_office"),
+        v.literal("restaurant"),
+        v.literal("salon"),
+        v.literal("other"),
+      ),
+    ),
+
+    // WGS84 geographic coordinates (lat/lng) for directions and nearby discovery.
+    location: v.optional(
+      v.object({
+        latitude: v.number(),
+        longitude: v.number(),
+      }),
+    ),
+
     // Weekly operating schedule; configurable after creation.
     businessHours: v.optional(v.array(businessDay)),
 

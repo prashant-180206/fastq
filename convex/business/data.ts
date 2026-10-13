@@ -23,6 +23,49 @@ const businessDay = v.object({
   slots: v.array(timeSlot),
 });
 
+export const businessType = v.union(
+  v.literal("business"),
+  v.literal("government_office"),
+  v.literal("restaurant"),
+  v.literal("salon"),
+  v.literal("other"),
+);
+
+const locationFields = v.object({
+  latitude: v.number(),
+  longitude: v.number(),
+});
+
+type LocationFields = {
+  latitude: number;
+  longitude: number;
+};
+
+function validateLocation(
+  location: LocationFields | undefined,
+): LocationFields | undefined {
+  if (location === undefined) {
+    return undefined;
+  }
+
+  if (
+    !Number.isFinite(location.latitude) ||
+    !Number.isFinite(location.longitude)
+  ) {
+    throw new Error("Location must be valid coordinates.");
+  }
+
+  if (location.latitude < -90 || location.latitude > 90) {
+    throw new Error("Latitude must be between -90 and 90.");
+  }
+
+  if (location.longitude < -180 || location.longitude > 180) {
+    throw new Error("Longitude must be between -180 and 180.");
+  }
+
+  return location;
+}
+
 // CREATE BUSINESS
 export const create = mutation({
   args: {
@@ -30,6 +73,8 @@ export const create = mutation({
     description: v.optional(v.string()),
     contactEmail: v.optional(v.string()),
     phone: v.optional(v.string()),
+    type: v.optional(businessType),
+    location: v.optional(locationFields),
   },
 
   handler: async (ctx, args) => {
@@ -49,6 +94,8 @@ export const create = mutation({
       description: args.description?.trim(),
       contactEmail: args.contactEmail?.trim(),
       phone: args.phone?.trim(),
+      type: args.type ?? "business",
+      location: validateLocation(args.location),
       status: "active",
       createdAt: now,
       updatedAt: now,
@@ -91,6 +138,8 @@ export const update = mutation({
     description: v.optional(v.string()),
     contactEmail: v.optional(v.string()),
     phone: v.optional(v.string()),
+    type: v.optional(businessType),
+    location: v.optional(locationFields),
   },
 
   handler: async (ctx, args) => {
@@ -101,6 +150,8 @@ export const update = mutation({
       description?: string;
       contactEmail?: string;
       phone?: string;
+      type?: typeof businessType.type;
+      location?: LocationFields | undefined;
       updatedAt: number;
     } = {
       updatedAt: Date.now(),
@@ -126,6 +177,14 @@ export const update = mutation({
 
     if (args.phone !== undefined) {
       patch.phone = args.phone.trim();
+    }
+
+    if (args.type !== undefined) {
+      patch.type = args.type;
+    }
+
+    if (args.location !== undefined) {
+      patch.location = validateLocation(args.location);
     }
 
     await ctx.db.patch(args.businessId, patch);
@@ -241,6 +300,8 @@ export const getAll = query({
           : null,
         contactEmail: business.contactEmail,
         phone: business.phone,
+        type: business.type ?? "business",
+        location: business.location,
         businessHours: business.businessHours,
         createdAt: business.createdAt,
       })),
@@ -270,6 +331,8 @@ export const getPublicById = query({
       logoUrl,
       contactEmail: business.contactEmail,
       phone: business.phone,
+      type: business.type ?? "business",
+      location: business.location,
       businessHours: business.businessHours,
       createdAt: business.createdAt,
     };

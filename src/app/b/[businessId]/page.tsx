@@ -20,9 +20,12 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { buttonVariants } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { businessTypeLabel } from "@/lib/business-type";
 import {
   ArrowLeft01Icon,
   Building01Icon,
+  Location01Icon,
   Queue02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -92,6 +95,24 @@ export default function PublicBusinessPage() {
   return (
     <main className="mx-auto max-w-6xl space-y-10 px-4 py-8 sm:px-6">
       <BusinessProfileHeader business={business} />
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Badge variant="secondary" className="h-6 rounded-full font-normal">
+          {businessTypeLabel(business.type)}
+        </Badge>
+
+        {business.location ? (
+          <a
+            href={`https://www.google.com/maps?q=${business.location.latitude},${business.location.longitude}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline"
+          >
+            <HugeiconsIcon icon={Location01Icon} strokeWidth={2} className="size-4" />
+            Get directions
+          </a>
+        ) : null}
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <WeeklyHours businessHours={business.businessHours} />

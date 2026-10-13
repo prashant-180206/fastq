@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScanBusinessButton } from "@/components/business/scan-business-button";
+import { businessTypeLabel } from "@/lib/business-type";
 import type { FunctionReturnType } from "convex/server";
 import {
   ArrowRight01Icon,
@@ -57,7 +59,7 @@ function BusinessCard({ business }: { business: Business }) {
               </Link>
             </h2>
             <Badge variant="secondary" className="mt-0.5 font-normal">
-              Business
+              {businessTypeLabel(business.type)}
             </Badge>
           </div>
         </div>
@@ -161,19 +163,22 @@ export default function CustomerHomePage() {
             their queue or book an appointment in a few taps.
           </p>
 
-          <div className="relative mt-2 max-w-md">
-            <HugeiconsIcon
-              icon={Search01Icon}
-              strokeWidth={2}
-              className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
-            />
-            <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search businesses, services…"
-              aria-label="Search businesses"
-              className="pl-10"
-            />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <div className="relative max-w-md flex-1">
+              <HugeiconsIcon
+                icon={Search01Icon}
+                strokeWidth={2}
+                className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
+              />
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search businesses, services…"
+                aria-label="Search businesses"
+                className="pl-10"
+              />
+            </div>
+            <ScanBusinessButton />
           </div>
         </div>
       </section>
