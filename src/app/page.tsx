@@ -84,7 +84,7 @@ export default function HomePage() {
 
         <footer className="px-6 py-6 text-center text-sm text-muted-foreground">
           <Separator className="mb-6" />
-          <p>© {new Date().getFullYear()} QuiLess</p>
+          <p>© 2026 QuiLess</p>
         </footer>
       </main>
     </div>

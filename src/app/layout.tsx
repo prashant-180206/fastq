@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { connection } from "next/server";
 import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import { ConvexClientProvider } from "@/hooks/ConvexProvider";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -14,10 +16,23 @@ export const metadata: Metadata = {
   description: "Queue and appointment management made simple.",
 };
 
-// Every route in this app is dynamic: auth + Convex data render on the
-// client, and static prerendering touches the clock (auth session freshness,
-// footer year), which Next 16 rejects for "unstable value" during prerender.
-export const dynamic = "force-dynamic";
+async function AuthBoundary({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  // Auth + Convex sessions depend on the incoming request, and prerendering
+  // touches the clock (session freshness, footer year) which cacheComponents
+  // rejects. connection() inside <Suspense> keeps the shell prerenderable
+  // while the authenticated tree renders at request time.
+  await connection();
+
+  return (
+    <ConvexAuthNextjsServerProvider>
+      <ConvexClientProvider>{children}</ConvexClientProvider>
+    </ConvexAuthNextjsServerProvider>
+  );
+}
 
 export default async function RootLayout({
   children,
@@ -25,8 +40,8 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ConvexAuthNextjsServerProvider>
-      <ConvexClientProvider>
+    <Suspense fallback={null}>
+      <AuthBoundary>
         <html
           lang="en"
           className={cn("font-sans", figtree.variable)}
@@ -44,7 +59,7 @@ export default async function RootLayout({
             </ThemeProvider>
           </body>
         </html>
-      </ConvexClientProvider>
-    </ConvexAuthNextjsServerProvider>
+      </AuthBoundary>
+    </Suspense>
   );
 }
