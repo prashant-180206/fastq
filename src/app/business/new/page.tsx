@@ -35,7 +35,12 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { BUSINESS_TYPES, type BusinessType } from "@/lib/business-type";
-import { ArrowLeft01Icon, Store01Icon } from "@hugeicons/core-free-icons";
+import { notifyError, notifySuccess } from "@/lib/toast";
+import {
+  ArrowLeft01Icon,
+  Gps01Icon,
+  Store01Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "cn";
 
@@ -50,8 +55,43 @@ export default function NewBusinessPage() {
   const [phone, setPhone] = useState("");
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
+  const [locating, setLocating] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+
+  function handleUseCurrentLocation() {
+    if (!("geolocation" in navigator)) {
+      notifyError(
+        "Geolocation not supported",
+        "Your browser does not support location services.",
+      );
+      return;
+    }
+
+    setLocating(true);
+    setError("");
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLatitude(position.coords.latitude.toFixed(6));
+        setLongitude(position.coords.longitude.toFixed(6));
+        setLocating(false);
+        notifySuccess("Location added", "Coordinates filled from your current position.");
+      },
+      (err) => {
+        setLocating(false);
+        notifyError(
+          "Could not get your location",
+          err.code === err.PERMISSION_DENIED
+            ? "Location permission was denied. Allow access in your browser to use this."
+            : err.code === err.POSITION_UNAVAILABLE
+              ? "Your location is currently unavailable. Try again or enter coordinates manually."
+              : "The request timed out. Try again or enter coordinates manually.",
+        );
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
+    );
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -245,6 +285,24 @@ export default function NewBusinessPage() {
               <FieldDescription>
                 Optional WGS84 coordinates for directions and nearby discovery.
               </FieldDescription>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full sm:w-fit"
+                onClick={handleUseCurrentLocation}
+                disabled={locating || saving}
+              >
+                {locating ? (
+                  <Spinner data-icon="inline-start" />
+                ) : (
+                  <HugeiconsIcon
+                    icon={Gps01Icon}
+                    strokeWidth={2}
+                    data-icon="inline-start"
+                  />
+                )}
+                {locating ? "Getting your location…" : "Use my current location"}
+              </Button>
 
               {error ? (
                 <Alert variant="destructive">

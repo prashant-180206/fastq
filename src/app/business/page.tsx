@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "convex/react";
+import { usePaginatedQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import { AppHeader } from "@/components/layout/app-header";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -20,6 +20,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import {
   ArrowUpRight01Icon,
   Building01Icon,
@@ -39,7 +40,15 @@ function statusVariant(status: string): "default" | "secondary" | "outline" {
 }
 
 export default function BusinessesPage() {
-  const businesses = useQuery(api.business.data.getMine, {});
+  const { results, status, loadMore } = usePaginatedQuery(
+    api.business.data.getMinePaginated,
+    {},
+    { initialNumItems: 6 },
+  );
+
+  const firstPageLoading = status === "LoadingFirstPage";
+  const loadingMore = status === "LoadingMore";
+  const showLoadMore = status === "CanLoadMore" || loadingMore;
 
   return (
     <>
@@ -65,7 +74,7 @@ export default function BusinessesPage() {
           </Link>
         </div>
 
-        {businesses === undefined ? (
+        {firstPageLoading && results.length === 0 ? (
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
             {Array.from({ length: 4 }).map((_, index) => (
               <Card key={index}>
@@ -79,7 +88,7 @@ export default function BusinessesPage() {
               </Card>
             ))}
           </div>
-        ) : businesses.length === 0 ? (
+        ) : results.length === 0 ? (
           <div className="mt-8">
             <Empty>
               <EmptyContent>
@@ -105,56 +114,74 @@ export default function BusinessesPage() {
             </Empty>
           </div>
         ) : (
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            {businesses.map((business) => {
-              const initials = (business.name ?? "?")
-                .split(" ")
-                .filter(Boolean)
-                .slice(0, 2)
-                .map((part) => part[0])
-                .join("")
-                .toUpperCase();
+          <>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2">
+              {results.map((business) => {
+                const initials = (business.name ?? "?")
+                  .split(" ")
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((part) => part[0])
+                  .join("")
+                  .toUpperCase();
 
-              return (
-                <Link
-                  key={business._id}
-                  href={`/business/${business._id}`}
-                  className="group"
-                >
-                  <Card className="h-full transition-colors group-hover:border-ring group-hover:bg-accent/40">
-                    <CardContent className="flex items-start gap-4 p-5">
-                      <Avatar className="size-10 shrink-0 rounded-xl">
-                        <AvatarFallback className="rounded-xl text-sm">
-                          {initials}
-                        </AvatarFallback>
-                      </Avatar>
+                return (
+                  <Link
+                    key={business._id}
+                    href={`/business/${business._id}`}
+                    className="group"
+                  >
+                    <Card className="h-full transition-colors group-hover:border-ring group-hover:bg-accent/40">
+                      <CardContent className="flex items-start gap-4 p-5">
+                        <Avatar className="size-10 shrink-0 rounded-xl">
+                          <AvatarFallback className="rounded-xl text-sm">
+                            {initials}
+                          </AvatarFallback>
+                        </Avatar>
 
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <h2 className="truncate font-medium">{business.name}</h2>
-                          <Badge
-                            variant={statusVariant(business.status)}
-                            className="h-5 rounded-full capitalize"
-                          >
-                            {business.status}
-                          </Badge>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <h2 className="truncate font-medium">{business.name}</h2>
+                            <Badge
+                              variant={statusVariant(business.status)}
+                              className="h-5 rounded-full capitalize"
+                            >
+                              {business.status}
+                            </Badge>
+                          </div>
+                          <CardDescription className="mt-1 line-clamp-2">
+                            {business.description || "No description added."}
+                          </CardDescription>
                         </div>
-                        <CardDescription className="mt-1 line-clamp-2">
-                          {business.description || "No description added."}
-                        </CardDescription>
-                      </div>
 
-                      <HugeiconsIcon
-                        icon={ArrowUpRight01Icon}
-                        strokeWidth={2}
-                        className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
-                      />
-                    </CardContent>
-                  </Card>
-                </Link>
-              );
-            })}
-          </div>
+                        <HugeiconsIcon
+                          icon={ArrowUpRight01Icon}
+                          strokeWidth={2}
+                          className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
+                        />
+                      </CardContent>
+                    </Card>
+                  </Link>
+                );
+              })}
+            </div>
+
+            {showLoadMore ? (
+              <div className="mt-8 flex justify-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => loadMore(6)}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? (
+                    <Spinner data-icon="inline-start" />
+                  ) : null}
+                  {loadingMore ? "Loading…" : "Load more"}
+                </Button>
+              </div>
+            ) : null}
+          </>
         )}
       </main>
     </>

@@ -1,13 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { useQuery } from "convex/react";
-import { api } from "@/../convex/_generated/api";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Empty,
   EmptyContent,
@@ -15,23 +13,24 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { ScanBusinessButton } from "@/components/business/scan-business-button";
+import { BusinessSearchFilters } from "@/components/business/business-search-filters";
+import { useBusinessSearch } from "@/hooks/use-business-search";
 import { businessTypeLabel } from "@/lib/business-type";
-import type { FunctionReturnType } from "convex/server";
+import { EMPTY_FILTERS, type BusinessSearchFilters as BusinessFilters } from "@/lib/business-search";
+import type { PublicBusinessRow } from "@/../convex/business/data";
 import {
   ArrowRight01Icon,
+  Location01Icon,
   Mail01Icon,
   Search01Icon,
-  Store01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "cn";
 
-type Business = FunctionReturnType<typeof api.business.data.getAll>[number];
-
-function BusinessCard({ business }: { business: Business }) {
+function BusinessCard({ business }: { business: PublicBusinessRow }) {
   const initials = business.name.slice(0, 1).toUpperCase();
 
   return (
@@ -120,28 +119,25 @@ function BusinessCardSkeleton() {
 }
 
 export default function CustomerHomePage() {
-  const businesses = useQuery(api.business.data.getAll, {});
-  const [query, setQuery] = useState("");
+  const [filters, setFilters] = useState<BusinessFilters>(EMPTY_FILTERS);
+  const { results, status, total, loadMore } =
+    useBusinessSearch(filters);
 
-  const filtered = useMemo(() => {
-    if (businesses === undefined) {
-      return undefined;
-    }
+  const firstPageLoading =
+    status === "LoadingFirstPage";
+  const loadingMore = status === "LoadingMore";
+  const exhausted = status === "Exhausted";
+  const showLoadMore = status === "CanLoadMore" || loadingMore;
 
-    const q = query.trim().toLowerCase();
+  const hasResults = results.length > 0;
 
-    if (!q) {
-      return businesses;
-    }
+  function updateFilters(patch: Partial<BusinessFilters>) {
+    setFilters((prev) => ({ ...prev, ...patch }));
+  }
 
-    return businesses.filter((business) =>
-      [business.name, business.description, business.contactEmail]
-        .filter(Boolean)
-        .some((field) => field!.toLowerCase().includes(q)),
-    );
-  }, [businesses, query]);
-
-  const hasBusinesses = businesses !== undefined && businesses.length > 0;
+  const mapHref = filters.center
+    ? `/customer/map?lat=${filters.center.latitude}&lng=${filters.center.longitude}&radius=${filters.radiusKm}`
+    : "/customer/map";
 
   return (
     <div className="flex flex-col gap-8">
@@ -151,39 +147,38 @@ export default function CustomerHomePage() {
             <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
               Discover businesses
             </h1>
-            {businesses !== undefined && (
+            {total !== undefined && (
               <Badge variant="secondary" className="rounded-full">
-                {businesses.length}{" "}
-                {businesses.length === 1 ? "business" : "businesses"}
+                {total >= 1000 ? "1000+" : total}{" "}
+                {total === 1 ? "match" : "matches"}
               </Badge>
             )}
           </div>
           <p className="max-w-2xl text-base leading-7 text-muted-foreground">
-            Find businesses around you, check what they offer, and join
-            their queue or book an appointment in a few taps.
+            Search by keyword or type, or locate yourself to surface businesses
+            nearby. Open a business to join its queue or book an appointment.
           </p>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-            <div className="relative max-w-md flex-1">
+          <BusinessSearchFilters
+            filters={filters}
+            onChange={updateFilters}
+          />
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Link href={mapHref} className={cn(buttonVariants({ variant: "outline" }))}>
               <HugeiconsIcon
-                icon={Search01Icon}
+                icon={Location01Icon}
                 strokeWidth={2}
-                className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
+                data-icon="inline-start"
               />
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search businesses, services…"
-                aria-label="Search businesses"
-                className="pl-10"
-              />
-            </div>
+              View on map
+            </Link>
             <ScanBusinessButton />
           </div>
         </div>
       </section>
 
-      {filtered === undefined ? (
+      {firstPageLoading || (loadingMore && !hasResults) ? (
         <section aria-label="Loading businesses">
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, index) => (
@@ -191,53 +186,65 @@ export default function CustomerHomePage() {
             ))}
           </div>
         </section>
-      ) : filtered.length === 0 ? (
+      ) : !hasResults ? (
         <section>
           <Empty className="border-dashed">
             <EmptyContent>
               <EmptyMedia variant="icon">
-                <HugeiconsIcon
-                  icon={hasBusinesses ? Search01Icon : Store01Icon}
-                  strokeWidth={2}
-                />
+                <HugeiconsIcon icon={Search01Icon} strokeWidth={2} />
               </EmptyMedia>
-              <EmptyTitle>
-                {hasBusinesses
-                  ? "No businesses match your search"
-                  : "No businesses yet"}
-              </EmptyTitle>
+              <EmptyTitle>No businesses match</EmptyTitle>
               <EmptyDescription>
-                {hasBusinesses
-                  ? "Try a different name or keyword to find what you are looking for."
-                  : "Be the first to list your business and let customers discover you on QuiLess."}
+                Try a different keyword or type, or widen your search radius to
+                find what you are looking for.
               </EmptyDescription>
-              <div className="flex flex-wrap items-center justify-center gap-3">
-                {hasBusinesses ? (
-                  <button
-                    type="button"
-                    onClick={() => setQuery("")}
-                    className={cn(buttonVariants({ variant: "outline" }))}
-                  >
-                    Clear search
-                  </button>
-                ) : (
-                  <Link
-                    href="/business/new"
-                    className={cn(buttonVariants())}
-                  >
-                    Add your business
-                  </Link>
-                )}
-              </div>
+              {filters.center ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    updateFilters({ center: null })
+                  }
+                >
+                  Clear location filter
+                </Button>
+              ) : null}
+              {filters.keyword !== "" || filters.type !== "all" ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    updateFilters({ keyword: "", type: "all" })
+                  }
+                >
+                  Clear search
+                </Button>
+              ) : null}
             </EmptyContent>
           </Empty>
         </section>
       ) : (
         <section aria-label="Businesses">
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((business) => (
+            {results.map((business) => (
               <BusinessCard key={business._id} business={business} />
             ))}
+          </div>
+
+          <div className="mt-8 flex flex-col items-center gap-2">
+            {showLoadMore ? (
+              <Button type="button" variant="outline" onClick={() => loadMore(8)} disabled={loadingMore}>
+                {loadingMore ? (
+                  <Spinner data-icon="inline-start" />
+                ) : null}
+                {loadingMore ? "Loading…" : "Load more businesses"}
+              </Button>
+            ) : exhausted && total !== undefined ? (
+              <p className="text-sm text-muted-foreground">
+                Showing all {total >= 1000 ? "1000+ of " : total}{" "}
+                matching {total === 1 ? "business" : "businesses"}.
+              </p>
+            ) : null}
           </div>
         </section>
       )}

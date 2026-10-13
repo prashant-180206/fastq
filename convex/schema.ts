@@ -75,6 +75,11 @@ export default defineSchema({
     // Weekly operating schedule; configurable after creation.
     businessHours: v.optional(v.array(businessDay)),
 
+    // Denormalized searchable text (name + description + contact) for the
+    // full-text search index. Kept in sync by create/update mutations and
+    // backfilled for pre-existing businesses by `business/migrations`.
+    searchText: v.optional(v.string()),
+
     status: v.union(
       v.literal("active"),
       v.literal("suspended"),
@@ -83,7 +88,11 @@ export default defineSchema({
 
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_owner", ["ownerId"]),
+  })
+    .index("by_owner", ["ownerId"])
+    .searchIndex("by_search_text", {
+      searchField: "searchText",
+    }),
 
   queues: defineTable({
     businessId: v.id("businesses"),

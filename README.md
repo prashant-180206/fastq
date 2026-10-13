@@ -18,16 +18,19 @@ Skip the wait. QuiLess lets businesses run **queues** and **appointments** in on
 | UI | Tailwind CSS v4, Base UI (`@base-ui/react`), shadcn (`components.json`) |
 | Icons | HugeIcons (`@hugeicons/core-free-icons` + `@hugeicons/react`) |
 | QR code | `qrcode.react` (render) + `html5-qrcode` (scan, business check-in) |
+| Maps | `leaflet` + `react-leaflet` |
 | Package manager | pnpm (`pnpm-workspace.yaml`) |
 
 ## Features
 
-- **Business profile**: onboarding, weekly operating hours, contact details, public page at `/b/[businessId]`.
+- **Business profile**: onboarding, weekly operating hours, business type (business / government office / restaurant / salon / other), optional WGS84 coordinates, contact details, public page at `/b/[businessId]`.
 - **Services**: per-service duration, queue- and/or appointment-enabled flags, active/inactive state.
 - **Queues**: prerequisites with acknowledgements, grace period, daily capacity model shared with appointments.
 - **Live queue ops**: call next, check-in (window + QR scan), start serving, complete, skip, cancel, no-show, expiry sweeps.
 - **Appointments**: slot availability (IST), booking, cancel, check-in, complete, no-show.
 - **Customer account**: dashboard summary, my tokens, my appointments, all live updates via Convex subscriptions.
+- **Find by QR**: customers can scan a business QR code from the customer home to open its public page directly.
+- **Business search**: debounced keyword + business-type filter, radius-based bounding-box geo search via `convex/lib/geo.ts` (updated per major library), live location with `use-debounce`, results on a Leaflet map at `/customer/map` and paginated "load more" lists.
 - **Theming**: dark/light/system via `next-themes`.
 
 ## Quick start

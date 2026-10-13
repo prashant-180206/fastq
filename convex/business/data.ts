@@ -1,7 +1,14 @@
 import { mutation, query } from "../_generated/server";
+import type { QueryCtx } from "../_generated/server";
+import type { DataModel, Doc } from "../_generated/dataModel";
+import {
+  paginationOptsValidator,
+  type FilterBuilder,
+} from "convex/server";
 import { v } from "convex/values";
 import { requireUser } from "../lib/auth";
 import { requireBusinessOwner } from "../lib/authorization";
+import { boundingBox, type BoundingBox, type GeoPoint } from "../lib/geo";
 
 // Shared validator for weekly business hours.
 const timeSlot = v.object({
@@ -66,6 +73,15 @@ function validateLocation(
   return location;
 }
 
+// Keep the denormalized full-text field in sync with the displayed content.
+function searchTextForBusiness(
+  name: string,
+  description: string | undefined,
+  contactEmail: string | undefined,
+): string {
+  return [name, description, contactEmail].filter(Boolean).join(" ");
+}
+
 // CREATE BUSINESS
 export const create = mutation({
   args: {
@@ -96,6 +112,11 @@ export const create = mutation({
       phone: args.phone?.trim(),
       type: args.type ?? "business",
       location: validateLocation(args.location),
+      searchText: searchTextForBusiness(
+        name,
+        args.description?.trim(),
+        args.contactEmail?.trim(),
+      ),
       status: "active",
       createdAt: now,
       updatedAt: now,
@@ -143,7 +164,7 @@ export const update = mutation({
   },
 
   handler: async (ctx, args) => {
-    await requireBusinessOwner(ctx, args.businessId);
+    const { business } = await requireBusinessOwner(ctx, args.businessId);
 
     const patch: {
       name?: string;
@@ -152,6 +173,7 @@ export const update = mutation({
       phone?: string;
       type?: typeof businessType.type;
       location?: LocationFields | undefined;
+      searchText?: string;
       updatedAt: number;
     } = {
       updatedAt: Date.now(),
@@ -186,6 +208,13 @@ export const update = mutation({
     if (args.location !== undefined) {
       patch.location = validateLocation(args.location);
     }
+
+    // Recompute the search index text whenever displayed fields change.
+    patch.searchText = searchTextForBusiness(
+      patch.name ?? business.name,
+      patch.description ?? business.description,
+      patch.contactEmail ?? business.contactEmail,
+    );
 
     await ctx.db.patch(args.businessId, patch);
 
@@ -338,4 +367,181 @@ export const getPublicById = query({
     };
   },
 });
+
+// CUSTOMER SEARCH
+// Keyword uses the full-text search index; type + location (lat/lng limits)
+// are applied as database filters. Cursor-paginated via Convex.
+export const search = query({
+  args: {
+    keyword: v.optional(v.string()),
+    type: v.optional(businessType),
+    center: v.optional(
+      v.object({ latitude: v.number(), longitude: v.number() }),
+    ),
+    radiusKm: v.optional(v.number()),
+    paginationOpts: paginationOptsValidator,
+  },
+
+  handler: async (ctx, args) => {
+    const keyword = args.keyword?.trim() || undefined;
+    const bounds = searchBounds(args.center, args.radiusKm);
+    const opts = { type: args.type, bounds };
+
+    const toPage = (business: Doc<"businesses">) =>
+      toPublicBusiness(ctx, business);
+
+    if (keyword !== undefined) {
+      const pages = await ctx.db
+        .query("businesses")
+        .withSearchIndex("by_search_text", (s) =>
+          s.search("searchText", keyword),
+        )
+        .filter((q) => applySearchFilters(q, opts))
+        .paginate(args.paginationOpts);
+
+      return {
+        ...pages,
+        page: await Promise.all(pages.page.map(toPage)),
+      };
+    }
+
+    const pages = await ctx.db
+      .query("businesses")
+      .order("desc")
+      .filter((q) => applySearchFilters(q, opts))
+      .paginate(args.paginationOpts);
+
+    return {
+      ...pages,
+      page: await Promise.all(pages.page.map(toPage)),
+    };
+  },
+});
+
+// TOTAL MATCHING COUNT FOR THE SAME SEARCH (for result badges / pagination UI).
+export const searchCount = query({
+  args: {
+    keyword: v.optional(v.string()),
+    type: v.optional(businessType),
+    center: v.optional(
+      v.object({ latitude: v.number(), longitude: v.number() }),
+    ),
+    radiusKm: v.optional(v.number()),
+  },
+
+  handler: async (ctx, args) => {
+    const keyword = args.keyword?.trim() || undefined;
+    const bounds = searchBounds(args.center, args.radiusKm);
+    const opts = { type: args.type, bounds };
+
+    if (keyword !== undefined) {
+      const matches = await ctx.db
+        .query("businesses")
+        .withSearchIndex("by_search_text", (s) =>
+          s.search("searchText", keyword),
+        )
+        .filter((q) => applySearchFilters(q, opts))
+        .take(1000);
+
+      return matches.length;
+    }
+
+    const matches = await ctx.db
+      .query("businesses")
+      .order("desc")
+      .filter((q) => applySearchFilters(q, opts))
+      .take(1000);
+
+    return matches.length;
+  },
+});
+
+// PAGINATED OWNER LISTING (business home page).
+export const getMinePaginated = query({
+  args: {
+    paginationOpts: paginationOptsValidator,
+  },
+
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+
+    return await ctx.db
+      .query("businesses")
+      .withIndex("by_owner", (q) => q.eq("ownerId", user._id))
+      .order("desc")
+      .paginate(args.paginationOpts);
+  },
+});
+
+// SHARED SEARCH FILTERS
+// Active + optional type + optional geographic bounding box (lat/lng limits).
+// Businesses outside the box are excluded in the database before pagination,
+// so we never fetch or compute euclidean distances client-side.
+function applySearchFilters(
+  q: FilterBuilder<DataModel["businesses"]>,
+  opts: {
+    type?: typeof businessType.type;
+    bounds?: BoundingBox;
+  },
+) {
+  let condition = q.eq(q.field("status"), "active");
+
+  if (opts.type) {
+    condition = q.and(condition, q.eq(q.field("type"), opts.type));
+  }
+
+  if (opts.bounds) {
+    condition = q.and(
+      condition,
+      q.gte(q.field("location.latitude"), opts.bounds.minLatitude),
+      q.lte(q.field("location.latitude"), opts.bounds.maxLatitude),
+      q.gte(q.field("location.longitude"), opts.bounds.minLongitude),
+      q.lte(q.field("location.longitude"), opts.bounds.maxLongitude),
+    );
+  }
+
+  return condition;
+}
+
+function searchBounds(
+  center: GeoPoint | undefined,
+  radiusKm: number | undefined,
+): BoundingBox | undefined {
+  if (center === undefined || radiusKm === undefined) {
+    return undefined;
+  }
+
+  return boundingBox(center, radiusKm);
+}
+
+export type PublicBusinessRow = {
+  _id: Doc<"businesses">["_id"];
+  name: string;
+  description: string | undefined;
+  logoUrl: string | null;
+  contactEmail: string | undefined;
+  phone: string | undefined;
+  type: typeof businessType.type;
+  location: { latitude: number; longitude: number } | undefined;
+  createdAt: number;
+};
+
+async function toPublicBusiness(
+  ctx: QueryCtx,
+  business: Doc<"businesses">,
+): Promise<PublicBusinessRow> {
+  return {
+    _id: business._id,
+    name: business.name,
+    description: business.description,
+    logoUrl: business.logoStorageId
+      ? await ctx.storage.getUrl(business.logoStorageId)
+      : null,
+    contactEmail: business.contactEmail,
+    phone: business.phone,
+    type: business.type ?? "business",
+    location: business.location,
+    createdAt: business.createdAt,
+  };
+}
 
