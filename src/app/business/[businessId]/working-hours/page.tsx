@@ -1,10 +1,31 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+} from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import { notifyError, notifySuccess } from "@/lib/toast";
+import { PlusIcon, TimeSetting03Icon, TrashIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { cn } from "cn";
 
 const DAYS = [
   "monday",
@@ -29,12 +50,27 @@ type BusinessDay = {
   slots: TimeSlot[];
 };
 
-function defaultHours(): BusinessDay[] {
-  return DAYS.map((day) => ({
-    day,
-    isOpen: false,
-    slots: [],
-  }));
+type InitialDay = {
+  day: DayName;
+  isOpen: boolean;
+  slots: { open: string; close: string }[];
+};
+
+function buildHours(initial: InitialDay[]): BusinessDay[] {
+  return DAYS.map((day) => {
+    const saved = initial.find((item) => item.day === day);
+
+    return saved
+      ? {
+          day,
+          isOpen: saved.isOpen,
+          slots: saved.slots.map((slot) => ({
+            open: slot.open,
+            close: slot.close,
+          })),
+        }
+      : { day, isOpen: false, slots: [] };
+  });
 }
 
 export default function WorkingHoursPage({
@@ -43,51 +79,74 @@ export default function WorkingHoursPage({
   params: Promise<{ businessId: string }>;
 }) {
   const { businessId } = use(params);
+  const typedBusinessId = businessId as Id<"businesses">;
 
   const business = useQuery(api.business.data.getById, {
-    businessId: businessId as Id<"businesses">,
+    businessId: typedBusinessId,
   });
 
+  if (business === undefined) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="space-y-2">
+          <Skeleton className="h-9 w-56" />
+          <Skeleton className="h-4 w-full max-w-md" />
+        </div>
+        <Skeleton className="h-28 rounded-3xl" />
+        <Skeleton className="h-28 rounded-3xl" />
+        <Skeleton className="h-28 rounded-3xl" />
+      </div>
+    );
+  }
+
+  if (business === null) {
+    return (
+      <Empty className="justify-center py-24">
+        <EmptyContent>
+          <EmptyMedia variant="icon">
+            <HugeiconsIcon icon={TimeSetting03Icon} strokeWidth={2} />
+          </EmptyMedia>
+          <EmptyTitle>Business not found</EmptyTitle>
+          <EmptyDescription>
+            It may have been removed or the link is incorrect.
+          </EmptyDescription>
+        </EmptyContent>
+        <Link href="/business" className={cn(buttonVariants({ size: "sm" }))}>
+          Return to businesses
+        </Link>
+      </Empty>
+    );
+  }
+
+  return (
+    <HoursEditor
+      key={business._id}
+      businessId={typedBusinessId}
+      initialHours={business.businessHours ?? []}
+    />
+  );
+}
+
+function HoursEditor({
+  businessId,
+  initialHours,
+}: {
+  businessId: Id<"businesses">;
+  initialHours: InitialDay[];
+}) {
   const saveHours = useMutation(api.business.data.updateBusinessHours);
 
-  const [hours, setHours] = useState<BusinessDay[]>(defaultHours);
-  const [initialized, setInitialized] = useState(false);
+  const [hours, setHours] = useState<BusinessDay[]>(() =>
+    buildHours(initialHours),
+  );
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    if (business === undefined || initialized) return;
-
-    const existing = business?.businessHours ?? [];
-
-    setHours(
-      DAYS.map((day) => {
-        const saved = existing.find((item) => item.day === day);
-
-        return saved
-          ? {
-              day,
-              isOpen: saved.isOpen,
-              slots: saved.slots.map((slot) => ({
-                open: slot.open,
-                close: slot.close,
-              })),
-            }
-          : { day, isOpen: false, slots: [] };
-      })
-    );
-
-    setInitialized(true);
-  }, [business, initialized]);
 
   function updateDay(
     day: DayName,
-    updater: (current: BusinessDay) => BusinessDay
+    updater: (current: BusinessDay) => BusinessDay,
   ) {
     setHours((current) =>
-      current.map((item) =>
-        item.day === day ? updater(item) : item
-      )
+      current.map((item) => (item.day === day ? updater(item) : item)),
     );
   }
 
@@ -107,12 +166,12 @@ export default function WorkingHoursPage({
     day: DayName,
     index: number,
     field: keyof TimeSlot,
-    value: string
+    value: string,
   ) {
     updateDay(day, (current) => ({
       ...current,
       slots: current.slots.map((slot, i) =>
-        i === index ? { ...slot, [field]: value } : slot
+        i === index ? { ...slot, [field]: value } : slot,
       ),
     }));
   }
@@ -120,10 +179,7 @@ export default function WorkingHoursPage({
   function addSlot(day: DayName) {
     updateDay(day, (current) => ({
       ...current,
-      slots: [
-        ...current.slots,
-        { open: "09:00", close: "17:00" },
-      ],
+      slots: [...current.slots, { open: "09:00", close: "17:00" }],
     }));
   }
 
@@ -135,159 +191,147 @@ export default function WorkingHoursPage({
   }
 
   async function handleSave() {
-    setMessage("");
     setSaving(true);
-
     try {
       await saveHours({
-        businessId: businessId as Id<"businesses">,
+        businessId,
         businessHours: hours,
       });
-
-      setMessage("Working hours saved successfully.");
+      notifySuccess("Working hours saved");
     } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Could not save working hours."
+      notifyError(
+        "Could not save working hours",
+        error instanceof Error ? error.message : "Please try again.",
       );
     } finally {
       setSaving(false);
     }
   }
 
-  if (business === undefined || !initialized) {
-    return <main className="p-6">Loading working hours...</main>;
-  }
-
-  if (business === null) {
-    return <main className="p-6">Business not found.</main>;
-  }
-
   return (
-    <main className="mx-auto max-w-3xl space-y-6 p-6">
-      <Link
-        href={`/business/${businessId}`}
-        className="text-sm text-gray-500 hover:underline"
-      >
-        ← Back to {business.name}
-      </Link>
-
-      <header>
-        <h1 className="text-2xl font-semibold">Working hours</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Set opening hours for each day. Add multiple slots for
-          split shifts.
+    <div className="flex flex-col gap-6">
+      <div>
+        <h1 className="font-heading text-3xl font-bold tracking-tight">
+          Working hours
+        </h1>
+        <p className="mt-1 max-w-2xl text-muted-foreground">
+          Set opening hours for each day. Add multiple slots for split
+          shifts.
         </p>
-      </header>
+      </div>
 
-      <div className="space-y-4">
+      <div className="flex flex-col gap-3">
         {hours.map((day) => (
-          <section
-            key={day.day}
-            className="space-y-4 rounded-xl border p-4"
-          >
-            <div className="flex items-center justify-between gap-4">
-              <h2 className="font-medium capitalize">{day.day}</h2>
+          <Card key={day.day} size="sm">
+            <CardContent className="gap-4">
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="font-heading text-base font-medium capitalize">
+                  {day.day}
+                </h2>
 
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={day.isOpen}
-                  onChange={(event) =>
-                    toggleDay(day.day, event.target.checked)
-                  }
-                />
-                Open
-              </label>
-            </div>
-
-            {!day.isOpen ? (
-              <p className="text-sm text-gray-500">Closed</p>
-            ) : (
-              <div className="space-y-3">
-                {day.slots.map((slot, index) => (
-                  <div
-                    key={index}
-                    className="flex flex-wrap items-end gap-3"
-                  >
-                    <label className="flex-1 space-y-1">
-                      <span className="text-xs text-gray-500">
-                        Opens
-                      </span>
-                      <input
-                        type="time"
-                        required
-                        value={slot.open}
-                        onChange={(event) =>
-                          updateSlot(
-                            day.day,
-                            index,
-                            "open",
-                            event.target.value
-                          )
-                        }
-                        className="w-full rounded-lg border px-3 py-2"
-                      />
-                    </label>
-
-                    <label className="flex-1 space-y-1">
-                      <span className="text-xs text-gray-500">
-                        Closes
-                      </span>
-                      <input
-                        type="time"
-                        required
-                        value={slot.close}
-                        onChange={(event) =>
-                          updateSlot(
-                            day.day,
-                            index,
-                            "close",
-                            event.target.value
-                          )
-                        }
-                        className="w-full rounded-lg border px-3 py-2"
-                      />
-                    </label>
-
-                    <button
-                      type="button"
-                      onClick={() => removeSlot(day.day, index)}
-                      className="rounded-lg border px-3 py-2 text-sm"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-
-                <button
-                  type="button"
-                  onClick={() => addSlot(day.day)}
-                  className="text-sm underline"
-                >
-                  + Add time slot
-                </button>
+                <label className="flex cursor-pointer items-center gap-2.5 text-sm">
+                  <Checkbox
+                    checked={day.isOpen}
+                    onCheckedChange={(checked) =>
+                      toggleDay(day.day, checked === true)
+                    }
+                  />
+                  Open
+                </label>
               </div>
-            )}
-          </section>
+
+              {!day.isOpen ? (
+                <p className="text-sm text-muted-foreground">Closed</p>
+              ) : (
+                <div className="grid gap-3">
+                  {day.slots.map((slot, index) => (
+                    <div
+                      key={index}
+                      className="flex flex-wrap items-end justify-between gap-3 rounded-2xl border p-3"
+                    >
+                      <div className="grid flex-1 gap-3 min-[400px]:grid-cols-2">
+                        <Field>
+                          <FieldLabel>Opens</FieldLabel>
+                          <Input
+                            type="time"
+                            required
+                            value={slot.open}
+                            onChange={(event) =>
+                              updateSlot(
+                                day.day,
+                                index,
+                                "open",
+                                event.target.value,
+                              )
+                            }
+                          />
+                        </Field>
+
+                        <Field>
+                          <FieldLabel>Closes</FieldLabel>
+                          <Input
+                            type="time"
+                            required
+                            value={slot.close}
+                            onChange={(event) =>
+                              updateSlot(
+                                day.day,
+                                index,
+                                "close",
+                                event.target.value,
+                              )
+                            }
+                          />
+                        </Field>
+                      </div>
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => removeSlot(day.day, index)}
+                      >
+                        <HugeiconsIcon
+                          icon={TrashIcon}
+                          strokeWidth={2}
+                          data-icon="inline-start"
+                        />
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-fit"
+                    onClick={() => addSlot(day.day)}
+                  >
+                    <HugeiconsIcon
+                      icon={PlusIcon}
+                      strokeWidth={2}
+                      data-icon="inline-start"
+                    />
+                    Add time slot
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         ))}
       </div>
 
-      {message && (
-        <p role="status" className="text-sm">
-          {message}
-        </p>
-      )}
-
-      <button
+      <Button
         type="button"
-        onClick={handleSave}
+        size="lg"
         disabled={saving}
-        className="w-full rounded-lg bg-black px-4 py-3 text-white disabled:opacity-50"
+        onClick={handleSave}
       >
-        {saving ? "Saving..." : "Save working hours"}
-      </button>
-    </main>
+        {saving ? <Spinner data-icon="inline-start" /> : null}
+        {saving ? "Saving…" : "Save working hours"}
+      </Button>
+    </div>
   );
 }

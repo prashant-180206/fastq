@@ -27,3 +27,11 @@ export function formatShortDateIST(timestamp: number): string {
     month: "short",
   }).format(timestamp);
 }
+
+export function formatDateTimeIST(timestamp: number): string {
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(timestamp);
+}

@@ -5,178 +5,292 @@ import { use, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import { formatDateTimeIST } from "@/lib/format";
+import { notifyError, notifySuccess } from "@/lib/toast";
+import { PageHeader } from "@/components/customer/page-header";
+import { useNow } from "@/hooks/use-now";
+import { Calendar02Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { cn } from "cn";
 
 type PageProps = {
   params: Promise<{ appointmentId: string }>;
 };
 
-function formatDate(timestamp?: number) {
-  if (timestamp === undefined) return "—";
-
-  return new Date(timestamp).toLocaleString("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
-
 function titleCase(value: string) {
   return value.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function statusVariant(status: string): "default" | "secondary" | "outline" {
+  if (["serving", "checked_in"].includes(status)) {
+    return "secondary";
+  }
+  if (["booked", "completed"].includes(status)) {
+    return "default";
+  }
+  return "outline";
+}
+
+function DetailRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div>
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="mt-1 font-medium">{value}</p>
+    </div>
+  );
+}
+
 export default function CustomerAppointmentDetailPage({ params }: PageProps) {
   const { appointmentId } = use(params);
+  const appointmentIdRef = appointmentId as Id<"appointments">;
+  const now = useNow();
 
-  const appointment = useQuery(api.business.appointments.getMyAppointmentById, {
-    appointmentId: appointmentId as Id<"appointments">,
-  });
+  const appointment = useQuery(
+    api.business.appointments.getMyAppointmentById,
+    { appointmentId: appointmentIdRef },
+  );
+  const businesses = useQuery(api.business.data.getAll, {});
 
   const cancelAppointment = useMutation(api.business.appointments.cancel);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-
-  if (appointment === undefined) {
-    return <main className="p-6">Loading appointment...</main>;
-  }
-
-  if (appointment === null) {
-    return (
-      <main className="mx-auto max-w-2xl space-y-4 p-6">
-        <h1 className="text-2xl font-bold">Appointment not found</h1>
-        <p className="text-gray-600">
-          This appointment may not exist or may not belong to your account.
-        </p>
-        <Link href="/customer/appointments" className="underline">
-          Return to appointments
-        </Link>
-      </main>
-    );
-  }
-
-  const canCancel =
-    appointment.status === "booked" && appointment.scheduledStart > Date.now();
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   async function handleCancel() {
-    if (!window.confirm("Cancel this appointment?")) return;
-
     setBusy(true);
     setError("");
-    setSuccess("");
 
     try {
-      await cancelAppointment({
-        appointmentId: appointmentId as Id<"appointments">,
-      });
-      setSuccess("Appointment cancelled successfully.");
+      await cancelAppointment({ appointmentId: appointmentIdRef });
+      notifySuccess("Appointment cancelled");
+      setConfirmOpen(false);
     } catch (err) {
-      setError(
+      const message =
         err instanceof Error
           ? err.message
-          : "Unable to cancel the appointment.",
-      );
+          : "Unable to cancel the appointment.";
+      setError(message);
+      notifyError(message);
+      setConfirmOpen(false);
     } finally {
       setBusy(false);
     }
   }
 
-  return (
-    <main className="mx-auto max-w-2xl space-y-6 p-6">
-      <header>
-        <Link href="/customer/appointments" className="text-sm underline">
-          ← My appointments
-        </Link>
+  if (appointment === undefined) {
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader
+          title="Appointment details"
+          subtitle="Loading your booking…"
+          backHref="/customer/appointments"
+          backLabel="My appointments"
+        />
+        <Card>
+          <CardContent className="gap-3">
+            <Skeleton className="h-6 w-40 rounded-full" />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-full" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
-        <h1 className="mt-3 text-3xl font-bold">Appointment details</h1>
-        <p className="mt-2 text-gray-600">
-          Review your booking and manage its status.
-        </p>
-      </header>
-
-      <section className="space-y-5 rounded-xl border p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">Booking information</h2>
-          <span className="rounded-full bg-gray-100 px-3 py-1 text-sm">
-            {titleCase(appointment.status)}
-          </span>
-        </div>
-
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div>
-            <p className="text-sm text-gray-500">Appointment starts</p>
-            <p className="mt-1 font-medium">
-              {formatDate(appointment.scheduledStart)}
-            </p>
-          </div>
-
-          <div>
-            <p className="text-sm text-gray-500">Appointment ends</p>
-            <p className="mt-1 font-medium">
-              {formatDate(appointment.scheduledEnd)}
-            </p>
-          </div>
-
-          <div>
-            <p className="text-sm text-gray-500">Booked on</p>
-            <p className="mt-1">{formatDate(appointment.createdAt)}</p>
-          </div>
-
-          <div>
-            <p className="text-sm text-gray-500">Last updated</p>
-            <p className="mt-1">{formatDate(appointment.updatedAt)}</p>
-          </div>
-        </div>
-
-        {appointment.notes && (
-          <div>
-            <p className="text-sm text-gray-500">Your notes</p>
-            <p className="mt-1 whitespace-pre-wrap">{appointment.notes}</p>
-          </div>
-        )}
-
-        <div className="space-y-2 border-t pt-4">
-          <p className="text-sm text-gray-500">
-            Business ID: {appointment.businessId}
-          </p>
+  if (appointment === null) {
+    return (
+      <div className="flex flex-col gap-6">
+        <Empty>
+          <EmptyContent>
+            <EmptyMedia variant="icon">
+              <HugeiconsIcon icon={Calendar02Icon} strokeWidth={2} />
+            </EmptyMedia>
+            <EmptyTitle>Appointment not found</EmptyTitle>
+            <EmptyDescription>
+              This appointment may not exist or may not belong to your account.
+            </EmptyDescription>
+          </EmptyContent>
           <Link
-            href={`/b/${appointment.businessId}`}
-            className="inline-block underline"
+            href="/customer/appointments"
+            className={cn(buttonVariants({ size: "sm" }))}
           >
-            View business
+            Return to appointments
           </Link>
-        </div>
+        </Empty>
+      </div>
+    );
+  }
 
-        {canCancel && (
-          <div className="border-t pt-4">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={handleCancel}
-              className="rounded-lg border border-red-300 px-4 py-2 text-red-700 disabled:opacity-50"
+  const business = businesses?.find(
+    (entry) => entry._id === appointment.businessId,
+  );
+  const canCancel =
+    appointment.status === "booked" && appointment.scheduledStart > now;
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Appointment details"
+        subtitle="Review your booking and manage its status."
+        backHref="/customer/appointments"
+        backLabel="My appointments"
+      />
+
+      <Card>
+        <CardContent className="flex flex-col gap-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-heading text-lg font-bold tracking-tight">
+              {business ? business.name : "Booking information"}
+            </h2>
+            <Badge
+              variant={statusVariant(appointment.status)}
+              className="h-6 rounded-full capitalize"
             >
-              {busy ? "Cancelling..." : "Cancel appointment"}
-            </button>
+              {titleCase(appointment.status)}
+            </Badge>
           </div>
-        )}
 
-        {!canCancel && appointment.status !== "cancelled" && (
-          <p className="border-t pt-4 text-sm text-gray-500">
-            Cancellation is not available for this appointment.
-          </p>
-        )}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <DetailRow
+              label="Appointment starts"
+              value={formatDateTimeIST(appointment.scheduledStart)}
+            />
+            <DetailRow
+              label="Appointment ends"
+              value={formatDateTimeIST(appointment.scheduledEnd)}
+            />
+            <DetailRow
+              label="Booked on"
+              value={formatDateTimeIST(appointment.createdAt)}
+            />
+            <DetailRow
+              label="Last updated"
+              value={formatDateTimeIST(appointment.updatedAt)}
+            />
+          </div>
 
-        {success && (
-          <p role="status" className="text-sm text-green-700">
-            {success}
-          </p>
-        )}
+          {appointment.notes ? (
+            <div>
+              <p className="text-sm text-muted-foreground">Your notes</p>
+              <p className="mt-1 whitespace-pre-wrap">{appointment.notes}</p>
+            </div>
+          ) : null}
 
-        {error && (
-          <p role="alert" className="text-sm text-red-600">
-            {error}
-          </p>
-        )}
-      </section>
-    </main>
+          {business && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+              <span className="text-sm text-muted-foreground">Business</span>
+              <Link
+                href={`/b/${business._id}`}
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "sm" }),
+                )}
+              >
+                View business
+              </Link>
+            </div>
+          )}
+
+          {canCancel ? (
+            <div className="flex flex-wrap gap-3 border-t pt-4">
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={busy}
+                onClick={() => setConfirmOpen(true)}
+              >
+                {busy ? (
+                  <>
+                    <Spinner />
+                    Cancelling…
+                  </>
+                ) : (
+                  <>
+                    <HugeiconsIcon
+                      icon={Cancel01Icon}
+                      strokeWidth={2}
+                      data-icon="inline-start"
+                    />
+                    Cancel appointment
+                  </>
+                )}
+              </Button>
+            </div>
+          ) : appointment.status !== "cancelled" ? (
+            <p className="border-t pt-4 text-sm text-muted-foreground">
+              Cancellation is not available for this appointment.
+            </p>
+          ) : null}
+
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <AlertDialog
+        open={confirmOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfirmOpen(false);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogMedia>
+              <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} />
+            </AlertDialogMedia>
+            <AlertDialogTitle>Cancel this appointment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your booking will be cancelled. You can book a new time whenever
+              you are ready.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep appointment</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleCancel}>
+              Cancel appointment
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }

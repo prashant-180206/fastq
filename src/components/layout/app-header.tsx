@@ -34,16 +34,20 @@ import { cn } from "cn";
 type NavItem = {
   href: string;
   label: string;
+  exact?: boolean;
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/discover", label: "Discover" },
+  { href: "/customer", label: "Discover", exact: true },
   { href: "/business", label: "My businesses" },
   { href: "/customer/dashboard", label: "My account" },
 ];
 
-function isActiveRoute(pathname: string, href: string) {
-  return pathname === href || pathname.startsWith(`${href}/`);
+function isActiveRoute(pathname: string, item: NavItem) {
+  if (item.exact) {
+    return pathname === item.href;
+  }
+  return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
 function UserMenu() {
@@ -165,7 +169,7 @@ export function AppHeader() {
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <div className="flex min-w-0 items-center gap-6">
-          <Logo href={isAuthenticated ? "/discover" : "/"} />
+          <Logo href={isAuthenticated ? "/customer" : "/"} />
 
           {isAuthenticated && (
             <nav className="hidden items-center gap-1 md:flex">
@@ -173,12 +177,12 @@ export function AppHeader() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={cn(
-                    "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
-                    isActiveRoute(pathname, item.href)
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                  )}
+className={cn(
+                      "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+                      isActiveRoute(pathname, item)
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                    )}
                 >
                   {item.label}
                 </Link>

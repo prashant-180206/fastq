@@ -5,6 +5,56 @@ import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
+import { notifyError, notifySuccess } from "@/lib/toast";
+import {
+  ArrowUpRight01Icon,
+  Clock01Icon,
+  PlusIcon,
+  ServiceIcon,
+  Ticket01Icon,
+  TrashIcon,
+  UserSwitchIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { cn } from "cn";
 
 export default function BusinessServicesPage({
   params,
@@ -13,6 +63,7 @@ export default function BusinessServicesPage({
 }) {
   const { businessId } = use(params);
   const businessDbId = businessId as Id<"businesses">;
+
   const services = useQuery(api.business.services.getByBusiness, {
     businessId: businessDbId,
   });
@@ -27,23 +78,32 @@ export default function BusinessServicesPage({
   const [appointmentsEnabled, setAppointmentsEnabled] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [workingId, setWorkingId] = useState<Id<"services"> | null>(null);
+  const [formError, setFormError] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: Id<"services">;
+    name: string;
+  } | null>(null);
 
-  async function create(event: FormEvent<HTMLFormElement>) {
+  async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError("");
-    setNotice("");
     const duration = Number(durationMinutes);
-    if (!name.trim()) return setError("Service name is required.");
+    if (!name.trim()) {
+      setFormError("Service name is required.");
+      return;
+    }
     if (!Number.isInteger(duration) || duration < 1 || duration > 480) {
-      return setError("Duration must be between 1 and 480 minutes.");
+      setFormError("Duration must be between 1 and 480 minutes.");
+      return;
     }
     if (!queueEnabled && !appointmentsEnabled) {
-      return setError("Enable queues, appointments, or both.");
+      setFormError("Enable queues, appointments, or both.");
+      return;
     }
 
+    setFormError("");
     setBusy(true);
+
     try {
       await createService({
         businessId: businessDbId,
@@ -53,268 +113,374 @@ export default function BusinessServicesPage({
         queueEnabled,
         appointmentsEnabled,
       });
+
       setName("");
       setDescription("");
       setDurationMinutes("20");
       setQueueEnabled(true);
       setAppointmentsEnabled(true);
       setShowCreateForm(false);
-      setNotice(
-        "Service created. Open it to configure its queues and appointments.",
+      notifySuccess(
+        "Service created",
+        "Open it to configure its queues and appointments.",
       );
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not create service.");
+    } catch (err) {
+      notifyError(
+        "Could not create service",
+        err instanceof Error ? err.message : "Please try again.",
+      );
     } finally {
       setBusy(false);
     }
   }
 
-  async function toggleActive(serviceId: Id<"services">, isActive: boolean) {
-    setError("");
-    setNotice("");
+  async function handleToggleActive(
+    serviceId: Id<"services">,
+    isActive: boolean,
+  ) {
+    setWorkingId(serviceId);
     try {
       await updateService({ serviceId, isActive: !isActive });
-      setNotice(isActive ? "Service deactivated." : "Service activated.");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not update service.");
+      notifySuccess(isActive ? "Service deactivated" : "Service activated");
+    } catch (err) {
+      notifyError(
+        "Could not update service",
+        err instanceof Error ? err.message : "Please try again.",
+      );
+    } finally {
+      setWorkingId(null);
     }
   }
 
-  async function deleteService(serviceId: Id<"services">, serviceName: string) {
-    if (
-      !window.confirm(
-        `Delete "${serviceName}"? This may be blocked if the service has dependent records.`,
-      )
-    )
+  async function handleDelete() {
+    if (!deleteTarget) {
       return;
-    setError("");
-    setNotice("");
+    }
     try {
-      await removeService({ serviceId });
-      setNotice("Service deleted.");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not delete service.");
+      await removeService({ serviceId: deleteTarget.id });
+      notifySuccess("Service deleted");
+      setDeleteTarget(null);
+    } catch (err) {
+      notifyError(
+        "Could not delete service",
+        err instanceof Error ? err.message : "Please try again.",
+      );
     }
   }
 
   if (services === undefined) {
     return (
-      <main className="min-h-screen bg-gray-50 p-6">
-        <div className="mx-auto max-w-6xl animate-pulse space-y-4">
-          <div className="h-8 w-48 rounded bg-gray-200" />
-          <div className="h-40 rounded-2xl bg-gray-200" />
+      <div className="flex flex-col gap-6">
+        <div className="space-y-2">
+          <Skeleton className="h-9 w-48" />
+          <Skeleton className="h-4 w-full max-w-md" />
         </div>
-      </main>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Skeleton key={index} className="h-56 rounded-3xl" />
+          ))}
+        </div>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 text-gray-950">
-      <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6 lg:p-8">
-        <Link
-          href={`/business/${businessId}`}
-          className="text-sm text-gray-500 hover:text-gray-950"
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div>
+          <p className="text-sm font-medium text-muted-foreground">
+            Business workspace
+          </p>
+          <h1 className="mt-1 font-heading text-3xl font-bold tracking-tight">
+            Services
+          </h1>
+          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+            Each service has its own workspace for queues, appointments, and
+            availability.
+          </p>
+        </div>
+
+        <Button
+          variant={showCreateForm ? "outline" : "default"}
+          onClick={() => {
+            setShowCreateForm((value) => !value);
+            setFormError("");
+          }}
         >
-          ← Business dashboard
-        </Link>
-        <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <div>
-            <p className="text-sm font-medium text-gray-500">
-              BUSINESS WORKSPACE
-            </p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight">
-              Services
-            </h1>
-            <p className="mt-2 text-sm text-gray-600">
-              Each service has its own workspace for queues, appointments, and
-              availability.
-            </p>
-          </div>
-          <button
-            onClick={() => setShowCreateForm((v) => !v)}
-            className="rounded-lg bg-gray-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800"
-          >
-            {showCreateForm ? "Close form" : "+ New service"}
-          </button>
-        </header>
-
-        {error && (
-          <div
-            role="alert"
-            className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"
-          >
-            {error}
-          </div>
-        )}
-        {notice && (
-          <div
-            role="status"
-            className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"
-          >
-            {notice}
-          </div>
-        )}
-
-        {showCreateForm && (
-          <form
-            onSubmit={create}
-            className="grid gap-4 rounded-2xl border bg-white p-5 md:grid-cols-2"
-          >
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Service name</label>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                maxLength={100}
-                placeholder="General consultation"
-                className={inputClass}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Duration (minutes)</label>
-              <input
-                type="number"
-                value={durationMinutes}
-                onChange={(e) => setDurationMinutes(e.target.value)}
-                min={1}
-                max={480}
-                required
-                className={inputClass}
-              />
-            </div>
-            <div className="space-y-1.5 md:col-span-2">
-              <label className="text-sm font-medium">Description</label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={2}
-                className={inputClass}
-                placeholder="Describe the service."
-              />
-            </div>
-            <div className="flex flex-wrap gap-5 md:col-span-2">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={queueEnabled}
-                  onChange={(e) => setQueueEnabled(e.target.checked)}
-                />{" "}
-                Live queue enabled
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={appointmentsEnabled}
-                  onChange={(e) => setAppointmentsEnabled(e.target.checked)}
-                />{" "}
-                Appointments enabled
-              </label>
-            </div>
-            <div className="flex gap-2 md:col-span-2">
-              <button
-                disabled={busy}
-                className="rounded-lg bg-gray-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-              >
-                {busy ? "Creating…" : "Create service"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowCreateForm(false)}
-                className="rounded-lg border px-4 py-2 text-sm"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        )}
-
-        {services.length === 0 ? (
-          <div className="rounded-2xl border border-dashed bg-white px-6 py-16 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-100 text-xl">
-              ＋
-            </div>
-            <h2 className="mt-4 font-semibold">Create your first service</h2>
-            <p className="mx-auto mt-2 max-w-md text-sm text-gray-500">
-              Services are the organizing unit for queues, appointment handling,
-              and capacity planning.
-            </p>
-            <button
-              onClick={() => setShowCreateForm(true)}
-              className="mt-5 rounded-lg bg-gray-950 px-4 py-2.5 text-sm font-medium text-white"
-            >
-              Create a service
-            </button>
-          </div>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {services.map((service) => (
-              <article
-                key={service._id}
-                className="flex flex-col rounded-2xl border bg-white p-5 transition hover:border-gray-300 hover:shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h2 className="truncate text-lg font-semibold">
-                      {service.name}
-                    </h2>
-                    <p className="mt-1 text-sm text-gray-500">
-                      {service.durationMinutes} min per customer
-                    </p>
-                  </div>
-                  <span
-                    className={`shrink-0 rounded-full border px-2.5 py-1 text-xs ${service.isActive ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 bg-gray-100 text-gray-600"}`}
-                  >
-                    {service.isActive ? "Active" : "Inactive"}
-                  </span>
-                </div>
-                <p className="mt-4 min-h-10 text-sm text-gray-600">
-                  {service.description || "No description added."}
-                </p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {service.queueEnabled && (
-                    <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs">
-                      Live queue
-                    </span>
-                  )}
-                  {service.appointmentsEnabled && (
-                    <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs">
-                      Appointments
-                    </span>
-                  )}
-                </div>
-                <div className="mt-6 flex flex-wrap gap-2">
-                  <Link
-                    href={`/business/${businessId}/services/${service._id}`}
-                    className="inline-flex flex-1 items-center justify-center rounded-lg bg-gray-950 px-3 py-2.5 text-sm font-medium text-white hover:bg-gray-800"
-                  >
-                    Open service workspace →
-                  </Link>
-                  <button
-                    onClick={() =>
-                      void toggleActive(service._id, service.isActive)
-                    }
-                    className="rounded-lg border px-3 py-2.5 text-sm"
-                  >
-                    {service.isActive ? "Deactivate" : "Activate"}
-                  </button>
-                  <button
-                    onClick={() =>
-                      void deleteService(service._id, service.name)
-                    }
-                    className="rounded-lg border border-red-200 px-3 py-2.5 text-sm text-red-700 hover:bg-red-50"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
+          <HugeiconsIcon icon={PlusIcon} strokeWidth={2} data-icon="inline-start" />
+          {showCreateForm ? "Close form" : "New service"}
+        </Button>
       </div>
-    </main>
+
+      {showCreateForm ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>New service</CardTitle>
+            <CardDescription>
+              Services organize queues, appointment handling, and capacity
+              planning.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleCreate} className="flex flex-col gap-5">
+              <div className="grid gap-5 md:grid-cols-2">
+                <Field>
+                  <FieldLabel htmlFor="service-name">Service name</FieldLabel>
+                  <Input
+                    id="service-name"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    required
+                    maxLength={100}
+                    placeholder="General consultation"
+                  />
+                </Field>
+
+                <Field>
+                  <FieldLabel htmlFor="service-duration">
+                    Duration (minutes)
+                  </FieldLabel>
+                  <Input
+                    id="service-duration"
+                    type="number"
+                    value={durationMinutes}
+                    onChange={(event) =>
+                      setDurationMinutes(event.target.value)
+                    }
+                    min={1}
+                    max={480}
+                    required
+                  />
+                </Field>
+              </div>
+
+              <Field>
+                <FieldLabel htmlFor="service-description">Description</FieldLabel>
+                <Textarea
+                  id="service-description"
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  rows={2}
+                  placeholder="Describe the service."
+                />
+              </Field>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border p-3.5 transition-colors hover:bg-muted/40">
+                  <Checkbox
+                    checked={queueEnabled}
+                    onCheckedChange={(checked) => setQueueEnabled(checked === true)}
+                  />
+                  <span className="text-sm font-medium">Live queue enabled</span>
+                </label>
+                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border p-3.5 transition-colors hover:bg-muted/40">
+                  <Checkbox
+                    checked={appointmentsEnabled}
+                    onCheckedChange={(checked) =>
+                      setAppointmentsEnabled(checked === true)
+                    }
+                  />
+                  <span className="text-sm font-medium">
+                    Appointments enabled
+                  </span>
+                </label>
+              </div>
+
+              {formError ? (
+                <Alert variant="destructive">
+                  <AlertTitle>Cannot create service</AlertTitle>
+                  <AlertDescription>{formError}</AlertDescription>
+                </Alert>
+              ) : null}
+
+              <div className="flex gap-2">
+                <Button type="submit" disabled={busy}>
+                  {busy ? <Spinner data-icon="inline-start" /> : null}
+                  {busy ? "Creating…" : "Create service"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowCreateForm(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {services.length === 0 ? (
+        <Empty>
+          <EmptyContent>
+            <EmptyMedia variant="icon">
+              <HugeiconsIcon icon={ServiceIcon} strokeWidth={2} />
+            </EmptyMedia>
+            <EmptyTitle>Create your first service</EmptyTitle>
+            <EmptyDescription>
+              Services are the organizing unit for queues, appointment
+              handling, and capacity planning.
+            </EmptyDescription>
+          </EmptyContent>
+          <div className="flex justify-center">
+            <Button
+              onClick={() => {
+                setShowCreateForm(true);
+                setFormError("");
+              }}
+            >
+              <HugeiconsIcon icon={PlusIcon} strokeWidth={2} data-icon="inline-start" />
+              Create a service
+            </Button>
+          </div>
+        </Empty>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {services.map((service) => {
+            const isWorking = workingId === service._id;
+
+            return (
+              <Card key={service._id} className="flex h-full flex-col">
+                <CardContent className="flex flex-1 flex-col p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h2 className="truncate font-heading text-lg font-semibold">
+                        {service.name}
+                      </h2>
+                      <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <HugeiconsIcon
+                          icon={Clock01Icon}
+                          strokeWidth={2}
+                          className="size-3.5"
+                        />
+                        {service.durationMinutes} min per customer
+                      </p>
+                    </div>
+                    <Badge
+                      className="h-5 shrink-0 rounded-full"
+                      variant={service.isActive ? "default" : "outline"}
+                    >
+                      {service.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+
+                  <p className="mt-4 line-clamp-2 text-sm text-muted-foreground">
+                    {service.description || "No description added."}
+                  </p>
+
+                  <div className="mt-4 flex flex-wrap gap-1.5">
+                    {service.queueEnabled ? (
+                      <Badge
+                        variant="secondary"
+                        className="h-5 gap-1 rounded-full"
+                      >
+                        <HugeiconsIcon
+                          icon={Ticket01Icon}
+                          strokeWidth={2}
+                          className="size-3"
+                        />
+                        Live queue
+                      </Badge>
+                    ) : null}
+                    {service.appointmentsEnabled ? (
+                      <Badge
+                        variant="secondary"
+                        className="h-5 rounded-full"
+                      >
+                        Appointments
+                      </Badge>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-6 flex flex-wrap gap-2 border-t pt-4">
+                    <Link
+                      href={`/business/${businessId}/services/${service._id}`}
+                      className={cn(
+                        buttonVariants({ size: "sm" }),
+                        "flex-1",
+                      )}
+                    >
+                      Manage workspace
+                      <HugeiconsIcon
+                        icon={ArrowUpRight01Icon}
+                        strokeWidth={2}
+                        data-icon="inline-end"
+                      />
+                    </Link>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isWorking || workingId !== null}
+                      onClick={() =>
+                        void handleToggleActive(service._id, service.isActive)
+                      }
+                    >
+                      {isWorking ? (
+                        <Spinner data-icon="inline-start" />
+                      ) : (
+                        <HugeiconsIcon
+                          icon={UserSwitchIcon}
+                          strokeWidth={2}
+                          data-icon="inline-start"
+                        />
+                      )}
+                      {service.isActive ? "Deactivate" : "Activate"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      disabled={workingId !== null}
+                      onClick={() =>
+                        setDeleteTarget({
+                          id: service._id,
+                          name: service.name,
+                        })
+                      }
+                    >
+                      <HugeiconsIcon
+                        icon={TrashIcon}
+                        strokeWidth={2}
+                        data-icon="inline-start"
+                      />
+                      Delete
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogMedia>
+              <HugeiconsIcon icon={TrashIcon} strokeWidth={2} />
+            </AlertDialogMedia>
+            <AlertDialogTitle>Delete {deleteTarget?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This is permanent. Deletion is blocked if the service has
+              dependent queues or appointments.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleDelete}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }
-
-const inputClass =
-  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-gray-500 focus:ring-2 focus:ring-gray-100";

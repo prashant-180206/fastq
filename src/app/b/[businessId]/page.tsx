@@ -77,7 +77,7 @@ export default function PublicBusinessPage() {
               QuiLess.
             </EmptyDescription>
             <Link
-              href="/discover"
+              href="/customer"
               className={cn(buttonVariants())}
             >
               <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} />

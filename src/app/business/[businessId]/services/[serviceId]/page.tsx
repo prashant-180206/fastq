@@ -1,10 +1,66 @@
 "use client";
 
-import { use, useMemo, useState, type FormEvent } from "react";
+import { use, useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { formatTimeIST, todayInIST } from "@/lib/format";
+import { notifyError, notifyInfo, notifySuccess } from "@/lib/toast";
+import {
+  ArrowLeft01Icon,
+  Calendar02Icon,
+  Clock01Icon,
+  PlusIcon,
+  Queue02Icon,
+  ServiceIcon,
+  Ticket01Icon,
+  TimeScheduleIcon,
+  TrashIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { cn } from "cn";
 
 type Tab = "overview" | "queues" | "live" | "appointments" | "availability";
 type QueueStatus = "active" | "paused" | "closed";
@@ -21,8 +77,6 @@ type Prerequisite = {
   isRequired: boolean;
 };
 
-const inputClass =
-  "w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-gray-500 focus:ring-2 focus:ring-gray-100";
 const tabs: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "queues", label: "Queues" },
@@ -31,19 +85,10 @@ const tabs: { id: Tab; label: string }[] = [
   { id: "availability", label: "Availability" },
 ];
 
-function localToday() {
-  const now = new Date();
-  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
-    .toISOString()
-    .slice(0, 10);
+function titleCase(value: string) {
+  return value.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
-function time(value: number) {
-  return new Intl.DateTimeFormat("en-IN", {
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone: "Asia/Kolkata",
-  }).format(value);
-}
+
 function dateTime(value: number) {
   return new Intl.DateTimeFormat("en-IN", {
     dateStyle: "medium",
@@ -51,44 +96,42 @@ function dateTime(value: number) {
     timeZone: "Asia/Kolkata",
   }).format(value);
 }
-function label(value: string) {
-  return value.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+function statusVariant(status: string): "default" | "secondary" | "outline" {
+  if (["active", "completed", "serving", "checked_in"].includes(status)) {
+    return "default";
+  }
+  if (["waiting", "called", "booked", "paused"].includes(status)) {
+    return "secondary";
+  }
+  return "outline";
 }
-function Pill({ value }: { value: string }) {
-  const green = ["active", "completed", "serving", "checked_in"].includes(
-    value,
-  );
-  const amber = ["waiting", "called", "booked", "paused"].includes(value);
-  return (
-    <span
-      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${green ? "border-emerald-200 bg-emerald-50 text-emerald-700" : amber ? "border-amber-200 bg-amber-50 text-amber-700" : "border-gray-200 bg-gray-100 text-gray-600"}`}
-    >
-      {label(value)}
-    </span>
-  );
-}
-function ActionButton({
-  children,
-  onClick,
-  disabled,
-  danger = false,
-  primary = false,
+
+function StatCard({
+  label,
+  value,
+  hint,
 }: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-  danger?: boolean;
-  primary?: boolean;
+  label: string;
+  value: number;
+  hint?: string;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50 ${primary ? "border-gray-950 bg-gray-950 text-white hover:bg-gray-800" : danger ? "border-red-200 text-red-700 hover:bg-red-50" : "border-gray-200 bg-white hover:bg-gray-50"}`}
-    >
-      {children}
-    </button>
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm font-normal text-muted-foreground">
+          {label}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-1">
+        <p className="font-heading text-3xl font-bold tracking-tight">
+          {value}
+        </p>
+        {hint ? (
+          <p className="text-xs text-muted-foreground">{hint}</p>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -111,12 +154,19 @@ export default function ServiceWorkspacePage({
     businessId: businessDbId,
   });
   const service = services?.find((item) => item._id === serviceDbId);
-  const queues =
-    allQueues?.filter((queue) => queue.serviceId === serviceDbId) ?? [];
-  const appointments =
-    allAppointments?.filter(
-      (appointment) => appointment.serviceId === serviceDbId,
-    ) ?? [];
+
+  const queues = useMemo(
+    () =>
+      allQueues?.filter((queue) => queue.serviceId === serviceDbId) ?? [],
+    [allQueues, serviceDbId],
+  );
+  const appointments = useMemo(
+    () =>
+      allAppointments?.filter(
+        (appointment) => appointment.serviceId === serviceDbId,
+      ) ?? [],
+    [allAppointments, serviceDbId],
+  );
 
   const updateService = useMutation(api.business.services.update);
   const createQueue = useMutation(api.business.queue.create);
@@ -131,13 +181,17 @@ export default function ServiceWorkspacePage({
   const markNoShow = useMutation(api.business.appointments.markNoShow);
 
   const [tab, setTab] = useState<Tab>("overview");
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [date, setDate] = useState(localToday());
+  const [date, setDate] = useState(todayInIST());
   const [appointmentFilter, setAppointmentFilter] = useState<
     "all" | AppointmentStatus
   >("all");
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   // Service settings
   const [editingSettings, setEditingSettings] = useState(false);
@@ -147,13 +201,18 @@ export default function ServiceWorkspacePage({
   const [queueEnabled, setQueueEnabled] = useState(true);
   const [appointmentsEnabled, setAppointmentsEnabled] = useState(true);
 
-  // Queue form is scoped to this service; users cannot accidentally assign a different service.
+  // Queue form is scoped to this service; users cannot assign a different service.
   const [editingQueueId, setEditingQueueId] = useState<string | null>(null);
   const [queueName, setQueueName] = useState("");
   const [queueDescription, setQueueDescription] = useState("");
   const [prerequisites, setPrerequisites] = useState<Prerequisite[]>([]);
   const [showQueueForm, setShowQueueForm] = useState(false);
   const [selectedQueueId, setSelectedQueueId] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{
+    queueId: Id<"queues">;
+    name: string;
+  } | null>(null);
+
   const selectedQueue =
     queues.find((queue) => queue._id === selectedQueueId) ?? queues[0];
   const tokens = useQuery(
@@ -185,7 +244,9 @@ export default function ServiceWorkspacePage({
   );
 
   function startSettingsEdit() {
-    if (!service) return;
+    if (!service) {
+      return;
+    }
     setName(service.name);
     setDescription(service.description ?? "");
     setDuration(String(service.durationMinutes));
@@ -196,19 +257,32 @@ export default function ServiceWorkspacePage({
 
   async function saveSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!service) return;
-    setError("");
-    setNotice("");
+    if (!service) {
+      return;
+    }
     const durationMinutes = Number(duration);
-    if (!name.trim()) return setError("Service name is required.");
+    if (!name.trim()) {
+      notifyError("Cannot save settings", "Service name is required.");
+      return;
+    }
     if (
       !Number.isInteger(durationMinutes) ||
       durationMinutes < 1 ||
       durationMinutes > 480
-    )
-      return setError("Duration must be between 1 and 480 minutes.");
-    if (!queueEnabled && !appointmentsEnabled)
-      return setError("Enable queues, appointments, or both.");
+    ) {
+      notifyError(
+        "Cannot save settings",
+        "Duration must be between 1 and 480 minutes.",
+      );
+      return;
+    }
+    if (!queueEnabled && !appointmentsEnabled) {
+      notifyError(
+        "Cannot save settings",
+        "Enable queues, appointments, or both.",
+      );
+      return;
+    }
     setBusy(true);
     try {
       await updateService({
@@ -220,9 +294,12 @@ export default function ServiceWorkspacePage({
         appointmentsEnabled,
       });
       setEditingSettings(false);
-      setNotice("Service settings saved.");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save settings.");
+      notifySuccess("Service settings saved");
+    } catch (error) {
+      notifyError(
+        "Could not save settings",
+        error instanceof Error ? error.message : "Please try again.",
+      );
     } finally {
       setBusy(false);
     }
@@ -235,7 +312,8 @@ export default function ServiceWorkspacePage({
     setPrerequisites([]);
     setShowQueueForm(false);
   }
-  function beginQueueEdit(queue: (typeof queues)[number]) {
+
+  function beginQueueEdit(queue: NonNullable<typeof queues[number]>) {
     setEditingQueueId(queue._id);
     setQueueName(queue.name);
     setQueueDescription(queue.description ?? "");
@@ -243,6 +321,7 @@ export default function ServiceWorkspacePage({
     setShowQueueForm(true);
     setTab("queues");
   }
+
   function addPrerequisite() {
     setPrerequisites((items) => [
       ...items,
@@ -254,6 +333,7 @@ export default function ServiceWorkspacePage({
       },
     ]);
   }
+
   function patchPrerequisite(index: number, patch: Partial<Prerequisite>) {
     setPrerequisites((items) =>
       items.map((item, i) => (i === index ? { ...item, ...patch } : item)),
@@ -262,20 +342,30 @@ export default function ServiceWorkspacePage({
 
   async function saveQueue(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!service) return;
-    setError("");
-    setNotice("");
-    if (!queueName.trim()) return setError("Queue name is required.");
-    if (!service.queueEnabled)
-      return setError("Enable live queues in service settings first.");
+    if (!service) {
+      return;
+    }
+    if (!queueName.trim()) {
+      notifyError("Cannot save queue", "Queue name is required.");
+      return;
+    }
+    if (!service.queueEnabled) {
+      notifyError(
+        "Cannot save queue",
+        "Enable live queues in service settings first.",
+      );
+      return;
+    }
     const cleaned = prerequisites.map((item) => ({
       ...item,
       id: item.id.trim(),
       label: item.label.trim(),
       description: item.description?.trim() || undefined,
     }));
-    if (cleaned.some((item) => !item.label))
-      return setError("Every prerequisite needs a label.");
+    if (cleaned.some((item) => !item.label)) {
+      notifyError("Cannot save queue", "Every prerequisite needs a label.");
+      return;
+    }
     setBusy(true);
     try {
       if (editingQueueId) {
@@ -286,7 +376,7 @@ export default function ServiceWorkspacePage({
           description: queueDescription.trim(),
           prerequisites: cleaned,
         });
-        setNotice("Queue updated.");
+        notifySuccess("Queue updated");
       } else {
         await createQueue({
           businessId: businessDbId,
@@ -295,37 +385,50 @@ export default function ServiceWorkspacePage({
           description: queueDescription.trim(),
           prerequisites: cleaned,
         });
-        setNotice("Queue created.");
+        notifySuccess("Queue created");
       }
       resetQueueForm();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save queue.");
+    } catch (error) {
+      notifyError(
+        "Could not save queue",
+        error instanceof Error ? error.message : "Please try again.",
+      );
     } finally {
       setBusy(false);
     }
   }
 
   async function queueStatus(queueId: Id<"queues">, status: QueueStatus) {
-    setError("");
-    setNotice("");
     try {
       await updateQueue({ queueId, status });
-      setNotice(`Queue ${label(status).toLowerCase()}.`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not update queue.");
+      notifySuccess(`Queue ${titleCase(status)}`);
+    } catch (error) {
+      notifyError(
+        "Could not update queue",
+        error instanceof Error ? error.message : "Please try again.",
+      );
     }
   }
-  async function deleteQueue(queueId: Id<"queues">, queueLabel: string) {
-    if (!window.confirm(`Delete queue "${queueLabel}"?`)) return;
-    setError("");
-    setNotice("");
+
+  async function handleDeleteQueue() {
+    if (!deleteTarget) {
+      return;
+    }
     try {
-      await removeQueue({ queueId });
-      if (selectedQueueId === queueId) setSelectedQueueId("");
-      if (editingQueueId === queueId) resetQueueForm();
-      setNotice("Queue deleted.");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not delete queue.");
+      await removeQueue({ queueId: deleteTarget.queueId });
+      if (selectedQueueId === deleteTarget.queueId) {
+        setSelectedQueueId("");
+      }
+      if (editingQueueId === deleteTarget.queueId) {
+        resetQueueForm();
+      }
+      notifySuccess("Queue deleted");
+      setDeleteTarget(null);
+    } catch (error) {
+      notifyError(
+        "Could not delete queue",
+        error instanceof Error ? error.message : "Please try again.",
+      );
     }
   }
 
@@ -333,30 +436,33 @@ export default function ServiceWorkspacePage({
     action: "call" | "start" | "complete" | "skip",
     tokenId?: Id<"queueTokens">,
   ) {
-    if (!selectedQueue) return;
-    setError("");
-    setNotice("");
+    if (!selectedQueue) {
+      return;
+    }
     setBusy(true);
     try {
       if (action === "call") {
         const result = await callNext({ queueId: selectedQueue._id });
-        setNotice(
-          result
-            ? `Called token #${result.tokenNumber}.`
-            : "No customers are waiting.",
-        );
+        if (result) {
+          notifySuccess(`Called token #${result.tokenNumber}`);
+        } else {
+          notifyInfo("No waiting customers", "No customers are waiting.");
+        }
       } else if (tokenId && action === "start") {
         await startServing({ tokenId });
-        setNotice("Service started.");
+        notifySuccess("Service started");
       } else if (tokenId && action === "complete") {
         await completeToken({ tokenId });
-        setNotice("Service completed.");
+        notifySuccess("Service completed");
       } else if (tokenId && action === "skip") {
         await skipToken({ tokenId });
-        setNotice("Token skipped.");
+        notifySuccess("Token skipped");
       }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Queue operation failed.");
+    } catch (error) {
+      notifyError(
+        "Queue operation failed",
+        error instanceof Error ? error.message : "Please try again.",
+      );
     } finally {
       setBusy(false);
     }
@@ -366,23 +472,22 @@ export default function ServiceWorkspacePage({
     action: "checkIn" | "complete" | "noShow",
     appointmentId: Id<"appointments">,
   ) {
-    setError("");
-    setNotice("");
     setBusy(true);
     try {
       if (action === "checkIn") {
         await checkInAppointment({ appointmentId });
-        setNotice("Appointment checked in.");
+        notifySuccess("Appointment checked in");
       } else if (action === "complete") {
         await completeAppointment({ appointmentId });
-        setNotice("Appointment completed.");
+        notifySuccess("Appointment completed");
       } else {
         await markNoShow({ appointmentId });
-        setNotice("Appointment marked no-show.");
+        notifySuccess("Appointment marked no-show");
       }
-    } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "Appointment operation failed.",
+    } catch (error) {
+      notifyError(
+        "Appointment operation failed",
+        error instanceof Error ? error.message : "Please try again.",
       );
     } finally {
       setBusy(false);
@@ -395,29 +500,49 @@ export default function ServiceWorkspacePage({
     allAppointments === undefined
   ) {
     return (
-      <main className="min-h-screen bg-gray-50 p-6">
-        <div className="mx-auto max-w-7xl animate-pulse space-y-4">
-          <div className="h-8 w-56 rounded bg-gray-200" />
-          <div className="h-40 rounded-2xl bg-gray-200" />
+      <div className="flex flex-col gap-6">
+        <div className="space-y-2">
+          <Skeleton className="h-9 w-64" />
+          <Skeleton className="h-4 w-full max-w-md" />
         </div>
-      </main>
+        <Skeleton className="h-10 w-96 rounded-4xl" />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Skeleton className="h-28 rounded-3xl" />
+          <Skeleton className="h-28 rounded-3xl" />
+          <Skeleton className="h-28 rounded-3xl" />
+          <Skeleton className="h-28 rounded-3xl" />
+        </div>
+      </div>
     );
   }
+
   if (!service) {
     return (
-      <main className="mx-auto max-w-3xl space-y-4 p-8">
-        <h1 className="text-2xl font-semibold">Service not found</h1>
-        <p className="text-sm text-gray-600">
-          This service does not belong to this business or may have been
-          deleted.
-        </p>
-        <Link
-          className="text-sm underline"
-          href={`/business/${businessId}/services`}
-        >
-          Back to services
-        </Link>
-      </main>
+      <div className="flex flex-col gap-6">
+        <Empty className="justify-center py-24">
+          <EmptyContent>
+            <EmptyMedia variant="icon">
+              <HugeiconsIcon icon={ServiceIcon} strokeWidth={2} />
+            </EmptyMedia>
+            <EmptyTitle>Service not found</EmptyTitle>
+            <EmptyDescription>
+              This service does not belong to this business or may have been
+              deleted.
+            </EmptyDescription>
+          </EmptyContent>
+          <Link
+            href={`/business/${businessId}/services`}
+            className={cn(buttonVariants({ size: "sm" }))}
+          >
+            <HugeiconsIcon
+              icon={ArrowLeft01Icon}
+              strokeWidth={2}
+              data-icon="inline-start"
+            />
+            Back to services
+          </Link>
+        </Empty>
+      </div>
     );
   }
 
@@ -433,879 +558,990 @@ export default function ServiceWorkspacePage({
   ).length;
 
   return (
-    <main className="min-h-screen bg-gray-50 text-gray-950">
-      <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
+    <div className="flex flex-col gap-6">
+      <div>
         <Link
           href={`/business/${businessId}/services`}
-          className="text-sm text-gray-500 hover:text-gray-950"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
-          ← All services
+          <HugeiconsIcon
+            icon={ArrowLeft01Icon}
+            strokeWidth={2}
+            data-icon="inline-start"
+          />
+          All services
         </Link>
-        <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <div>
-            <p className="text-sm font-medium text-gray-500">
-              SERVICE WORKSPACE
+
+        <div className="mt-2 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              Service workspace
             </p>
             <div className="mt-1 flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-semibold tracking-tight">
+              <h1 className="font-heading text-3xl font-bold tracking-tight">
                 {service.name}
               </h1>
-              <Pill value={service.isActive ? "active" : "inactive"} />
+              <Badge
+                variant={statusVariant(service.isActive ? "active" : "inactive")}
+                className="h-5 rounded-full capitalize"
+              >
+                {service.isActive ? "active" : "inactive"}
+              </Badge>
             </div>
-            <p className="mt-2 max-w-2xl text-sm text-gray-600">
+            <p className="mt-1 max-w-2xl text-muted-foreground">
               {service.description ||
                 "Manage this service's queues, appointments, and capacity from here."}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <span className="rounded-full border bg-white px-3 py-1 text-xs">
+              <Badge variant="outline" className="h-6 rounded-xl">
                 {service.durationMinutes} min duration
-              </span>
-              {service.queueEnabled && (
-                <span className="rounded-full border bg-white px-3 py-1 text-xs">
+              </Badge>
+              {service.queueEnabled ? (
+                <Badge variant="outline" className="h-6 rounded-xl">
                   Queues enabled
-                </span>
-              )}
-              {service.appointmentsEnabled && (
-                <span className="rounded-full border bg-white px-3 py-1 text-xs">
+                </Badge>
+              ) : null}
+              {service.appointmentsEnabled ? (
+                <Badge variant="outline" className="h-6 rounded-xl">
                   Appointments enabled
-                </span>
-              )}
+                </Badge>
+              ) : null}
             </div>
           </div>
-          <ActionButton onClick={startSettingsEdit}>
+
+          <Button
+            variant="outline"
+            onClick={startSettingsEdit}
+            disabled={busy}
+          >
             Edit service settings
-          </ActionButton>
-        </header>
+          </Button>
+        </div>
+      </div>
 
-        {error && (
-          <div
-            role="alert"
-            className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"
-          >
-            {error}
-          </div>
-        )}
-        {notice && (
-          <div
-            role="status"
-            className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"
-          >
-            {notice}
-          </div>
-        )}
+      {editingSettings ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Service settings</CardTitle>
+            <CardDescription>
+              Toggle how customers can engage with {service.name}.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={saveSettings} className="grid gap-5 md:grid-cols-2">
+              <Field>
+                <FieldLabel>Name</FieldLabel>
+                <Input
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  required
+                />
+              </Field>
 
-        {editingSettings && (
-          <form
-            onSubmit={saveSettings}
-            className="grid gap-4 rounded-2xl border bg-white p-5 md:grid-cols-2"
-          >
-            <h2 className="text-lg font-semibold md:col-span-2">
-              Service settings
-            </h2>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Name</label>
-              <input
-                className={inputClass}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Duration in minutes</label>
-              <input
-                className={inputClass}
-                type="number"
-                min={1}
-                max={480}
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-1.5 md:col-span-2">
-              <label className="text-sm font-medium">Description</label>
-              <textarea
-                className={inputClass}
-                rows={2}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-wrap gap-5 md:col-span-2">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={queueEnabled}
-                  onChange={(e) => setQueueEnabled(e.target.checked)}
-                />{" "}
-                Enable live queue
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={appointmentsEnabled}
-                  onChange={(e) => setAppointmentsEnabled(e.target.checked)}
-                />{" "}
-                Enable appointments
-              </label>
-            </div>
-            <div className="flex gap-2 md:col-span-2">
-              <button
-                disabled={busy}
-                className="rounded-lg bg-gray-950 px-4 py-2 text-sm text-white"
-              >
-                {busy ? "Saving…" : "Save settings"}
-              </button>
-              <ActionButton onClick={() => setEditingSettings(false)}>
-                Cancel
-              </ActionButton>
-            </div>
-          </form>
-        )}
+              <Field>
+                <FieldLabel>Duration in minutes</FieldLabel>
+                <Input
+                  type="number"
+                  min={1}
+                  max={480}
+                  value={duration}
+                  onChange={(event) => setDuration(event.target.value)}
+                  required
+                />
+              </Field>
 
-        <nav className="flex gap-1 overflow-x-auto rounded-xl border bg-white p-1">
-          {tabs.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setTab(item.id)}
-              className={`shrink-0 rounded-lg px-3 py-2.5 text-sm font-medium ${tab === item.id ? "bg-gray-950 text-white" : "text-gray-600 hover:bg-gray-100"}`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
+              <Field className="md:col-span-2">
+                <FieldLabel>Description</FieldLabel>
+                <Textarea
+                  rows={2}
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                />
+              </Field>
 
-        {tab === "overview" && (
-          <section className="space-y-5">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {[
-                {
-                  label: "Queues",
-                  value: queues.length,
-                  hint: "Configured for this service",
-                },
-                {
-                  label: "Active queues",
-                  value: queues.filter((q) => q.status === "active").length,
-                  hint: "Accepting customers",
-                },
-                {
-                  label: "Active appointments",
-                  value: activeAppointments,
-                  hint: "Booked or checked in",
-                },
-                {
-                  label: "Appointment records",
-                  value: appointments.length,
-                  hint: "All recorded statuses",
-                },
-              ].map((metric) => (
-                <article
-                  key={metric.label}
-                  className="rounded-2xl border bg-white p-5"
+              <div className="flex flex-wrap gap-6 md:col-span-2">
+                <label className="flex cursor-pointer items-center gap-2.5 text-sm">
+                  <Checkbox
+                    checked={queueEnabled}
+                    onCheckedChange={(checked) =>
+                      setQueueEnabled(checked === true)
+                    }
+                  />
+                  Enable live queue
+                </label>
+                <label className="flex cursor-pointer items-center gap-2.5 text-sm">
+                  <Checkbox
+                    checked={appointmentsEnabled}
+                    onCheckedChange={(checked) =>
+                      setAppointmentsEnabled(checked === true)
+                    }
+                  />
+                  Enable appointments
+                </label>
+              </div>
+
+              <div className="flex gap-2 md:col-span-2">
+                <Button type="submit" disabled={busy}>
+                  {busy ? <Spinner data-icon="inline-start" /> : null}
+                  {busy ? "Saving…" : "Save settings"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditingSettings(false)}
+                  disabled={busy}
                 >
-                  <p className="text-sm text-gray-500">{metric.label}</p>
-                  <p className="mt-2 text-3xl font-semibold">{metric.value}</p>
-                  <p className="mt-1 text-xs text-gray-500">{metric.hint}</p>
-                </article>
-              ))}
-            </div>
-            <div className="grid gap-4 lg:grid-cols-3">
-              <button
-                onClick={() => setTab("queues")}
-                className="rounded-2xl border bg-white p-5 text-left hover:border-gray-400"
-              >
-                <h2 className="font-semibold">Configure queues</h2>
-                <p className="mt-2 text-sm text-gray-500">
-                  Create queues linked specifically to {service.name} and manage
-                  prerequisites.
-                </p>
-                <span className="mt-4 inline-block text-sm font-medium">
-                  Manage queues →
-                </span>
-              </button>
-              <button
-                onClick={() => setTab("live")}
-                className="rounded-2xl border bg-white p-5 text-left hover:border-gray-400"
-              >
-                <h2 className="font-semibold">Run live queue</h2>
-                <p className="mt-2 text-sm text-gray-500">
-                  Call tokens, start service, and complete or skip customers.
-                </p>
-                <span className="mt-4 inline-block text-sm font-medium">
-                  Open live queue →
-                </span>
-              </button>
-              <button
-                onClick={() => setTab("appointments")}
-                className="rounded-2xl border bg-white p-5 text-left hover:border-gray-400"
-              >
-                <h2 className="font-semibold">Appointment desk</h2>
-                <p className="mt-2 text-sm text-gray-500">
-                  View bookings for this service, check in customers, and
-                  complete visits.
-                </p>
-                <span className="mt-4 inline-block text-sm font-medium">
-                  Manage appointments →
-                </span>
-              </button>
-            </div>
-          </section>
-        )}
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      ) : null}
 
-        {tab === "queues" && (
-          <section className="grid items-start gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-            <div className="space-y-3">
+      <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
+        <TabsList className="w-fit max-w-full overflow-x-auto">
+          {tabs.map((item) => (
+            <TabsTrigger key={item.id} value={item.id}>
+              {item.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        <TabsContent value="overview" className="flex flex-col gap-5 pt-2">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              label="Queues"
+              value={queues.length}
+              hint="Configured for this service"
+            />
+            <StatCard
+              label="Active queues"
+              value={queues.filter((queue) => queue.status === "active").length}
+              hint="Accepting customers"
+            />
+            <StatCard
+              label="Active appointments"
+              value={activeAppointments}
+              hint="Booked or checked in"
+            />
+            <StatCard
+              label="Appointment records"
+              value={appointments.length}
+              hint="All recorded statuses"
+            />
+          </div>
+
+          <div className="grid gap-3 lg:grid-cols-3">
+            <Button
+              variant="outline"
+              className="h-auto flex-col items-start justify-start gap-2 p-5 text-left"
+              onClick={() => setTab("queues")}
+            >
+              <HugeiconsIcon icon={Queue02Icon} strokeWidth={2} data-icon="inline-start" />
+              <span className="font-semibold">Configure queues</span>
+              <span className="text-sm font-normal text-muted-foreground">
+                Create queues linked specifically to {service.name} and manage
+                prerequisites.
+              </span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-auto flex-col items-start justify-start gap-2 p-5 text-left"
+              onClick={() => setTab("live")}
+            >
+              <HugeiconsIcon icon={Clock01Icon} strokeWidth={2} data-icon="inline-start" />
+              <span className="font-semibold">Run live queue</span>
+              <span className="text-sm font-normal text-muted-foreground">
+                Call tokens, start service, and complete or skip customers.
+              </span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-auto flex-col items-start justify-start gap-2 p-5 text-left"
+              onClick={() => setTab("appointments")}
+            >
+              <HugeiconsIcon icon={Calendar02Icon} strokeWidth={2} data-icon="inline-start" />
+              <span className="font-semibold">Appointment desk</span>
+              <span className="text-sm font-normal text-muted-foreground">
+                View bookings for this service, check in customers, and complete
+                visits.
+              </span>
+            </Button>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="queues" className="flex flex-col gap-5 pt-2">
+          <div className="grid items-start gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+            <div className="flex min-w-0 flex-col gap-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-xl font-semibold">
+                  <h2 className="font-heading text-xl font-bold tracking-tight">
                     Queues for {service.name}
                   </h2>
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     Only queues linked to this service are shown.
                   </p>
                 </div>
-                <ActionButton
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!service.queueEnabled}
                   onClick={() => {
                     resetQueueForm();
                     setShowQueueForm(true);
                   }}
-                  disabled={!service.queueEnabled}
                 >
-                  + New queue
-                </ActionButton>
+                  <HugeiconsIcon
+                    icon={PlusIcon}
+                    strokeWidth={2}
+                    data-icon="inline-start"
+                  />
+                  New queue
+                </Button>
               </div>
-              {!service.queueEnabled && (
-                <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+
+              {!service.queueEnabled ? (
+                <p className="text-sm text-amber-600 dark:text-amber-500">
                   Live queues are disabled for this service. Enable them in
                   service settings to create queues.
                 </p>
-              )}
+              ) : null}
+
               {queues.length === 0 ? (
-                <div className="rounded-2xl border border-dashed bg-white p-8 text-center">
-                  <h3 className="font-semibold">No queues yet</h3>
-                  <p className="mt-2 text-sm text-gray-500">
-                    Create a queue for this service to start managing walk-in
-                    customers.
-                  </p>
-                </div>
+                <Empty className="border-dashed">
+                  <EmptyContent>
+                    <EmptyMedia variant="icon">
+                      <HugeiconsIcon icon={Queue02Icon} strokeWidth={2} />
+                    </EmptyMedia>
+                    <EmptyTitle>No queues yet</EmptyTitle>
+                    <EmptyDescription>
+                      Create a queue for this service to start managing walk-in
+                      customers.
+                    </EmptyDescription>
+                  </EmptyContent>
+                </Empty>
               ) : (
                 queues.map((queue) => (
-                  <article
-                    key={queue._id}
-                    className="rounded-2xl border bg-white p-4"
-                  >
-                    <div className="flex flex-col justify-between gap-3 sm:flex-row">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-semibold">{queue.name}</h3>
-                          <Pill value={queue.status} />
-                        </div>
-                        <p className="mt-1 text-sm text-gray-500">
-                          {queue.description || "No description"}
-                        </p>
-                        <p className="mt-2 text-xs text-gray-500">
-                          {queue.prerequisites.length} prerequisite(s)
-                        </p>
+                  <Card key={queue._id} size="sm">
+                    <CardContent className="flex flex-col gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-semibold">{queue.name}</h3>
+                        <Badge
+                          variant={statusVariant(queue.status)}
+                          className="h-5 rounded-full capitalize"
+                        >
+                          {queue.status}
+                        </Badge>
                       </div>
-                      <div className="flex flex-wrap content-start gap-2">
-                        <ActionButton
+                      <p className="text-sm text-muted-foreground">
+                        {queue.description || "No description"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {queue.prerequisites.length} prerequisite(s)
+                      </p>
+
+                      <div className="flex flex-wrap gap-2 border-t pt-3">
+                        <Button
+                          size="sm"
+                          disabled={busy}
                           onClick={() => {
                             setSelectedQueueId(queue._id);
                             setTab("live");
                           }}
                         >
                           Live operations
-                        </ActionButton>
-                        <ActionButton onClick={() => beginQueueEdit(queue)}>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busy}
+                          onClick={() => beginQueueEdit(queue)}
+                        >
                           Edit
-                        </ActionButton>
-                        {queue.status !== "active" && (
-                          <ActionButton
+                        </Button>
+                        {queue.status !== "active" ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy}
                             onClick={() =>
                               void queueStatus(queue._id, "active")
                             }
                           >
                             Activate
-                          </ActionButton>
-                        )}
-                        {queue.status === "active" && (
-                          <ActionButton
+                          </Button>
+                        ) : null}
+                        {queue.status === "active" ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy}
                             onClick={() =>
                               void queueStatus(queue._id, "paused")
                             }
                           >
                             Pause
-                          </ActionButton>
-                        )}
-                        {queue.status !== "closed" && (
-                          <ActionButton
+                          </Button>
+                        ) : null}
+                        {queue.status !== "closed" ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy}
                             onClick={() =>
                               void queueStatus(queue._id, "closed")
                             }
                           >
                             Close
-                          </ActionButton>
-                        )}
-                        {queue.status === "closed" && (
-                          <ActionButton
+                          </Button>
+                        ) : null}
+                        {queue.status === "closed" ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy}
                             onClick={() =>
                               void queueStatus(queue._id, "paused")
                             }
                           >
                             Reopen
-                          </ActionButton>
-                        )}
-                        <ActionButton
-                          danger
+                          </Button>
+                        ) : null}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="ml-auto text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          disabled={busy}
                           onClick={() =>
-                            void deleteQueue(queue._id, queue.name)
+                            setDeleteTarget({
+                              queueId: queue._id,
+                              name: queue.name,
+                            })
                           }
                         >
+                          <HugeiconsIcon
+                            icon={TrashIcon}
+                            strokeWidth={2}
+                            data-icon="inline-start"
+                          />
                           Delete
-                        </ActionButton>
+                        </Button>
                       </div>
-                    </div>
-                  </article>
+                    </CardContent>
+                  </Card>
                 ))
               )}
             </div>
-            {showQueueForm && (
-              <form
-                onSubmit={saveQueue}
-                className="space-y-4 rounded-2xl border bg-white p-5"
-              >
-                <h2 className="text-lg font-semibold">
-                  {editingQueueId ? "Edit queue" : "Create queue"}
-                </h2>
-                <p className="text-sm text-gray-500">
-                  Service: <strong>{service.name}</strong> (fixed)
-                </p>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Queue name</label>
-                  <input
-                    className={inputClass}
-                    value={queueName}
-                    onChange={(e) => setQueueName(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Description</label>
-                  <textarea
-                    className={inputClass}
-                    rows={2}
-                    value={queueDescription}
-                    onChange={(e) => setQueueDescription(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-sm font-semibold">Prerequisites</h3>
-                    <ActionButton onClick={addPrerequisite}>
-                      Add requirement
-                    </ActionButton>
-                  </div>
-                  {prerequisites.length === 0 && (
-                    <p className="text-sm text-gray-500">
-                      No prerequisites configured.
-                    </p>
-                  )}
-                  {prerequisites.map((item, index) => (
-                    <div
-                      key={item.id}
-                      className="space-y-2 rounded-xl border p-3"
-                    >
-                      <input
-                        className={inputClass}
-                        placeholder="Requirement label"
-                        value={item.label}
-                        onChange={(e) =>
-                          patchPrerequisite(index, { label: e.target.value })
-                        }
+
+            {showQueueForm ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    {editingQueueId ? "Edit queue" : "Create queue"}
+                  </CardTitle>
+                  <CardDescription>
+                    Service: <span className="font-medium">{service.name}</span>{" "}
+                    (fixed)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form
+                    onSubmit={saveQueue}
+                    className="grid gap-4"
+                    id="queue-form"
+                  >
+                    <Field>
+                      <FieldLabel>Queue name</FieldLabel>
+                      <Input
+                        value={queueName}
+                        onChange={(event) => setQueueName(event.target.value)}
                         required
                       />
-                      <input
-                        className={inputClass}
-                        placeholder="Optional explanation"
-                        value={item.description ?? ""}
-                        onChange={(e) =>
-                          patchPrerequisite(index, {
-                            description: e.target.value,
-                          })
+                    </Field>
+
+                    <Field>
+                      <FieldLabel>Description</FieldLabel>
+                      <Textarea
+                        rows={2}
+                        value={queueDescription}
+                        onChange={(event) =>
+                          setQueueDescription(event.target.value)
                         }
                       />
-                      <div className="flex items-center justify-between">
-                        <label className="flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={item.isRequired}
-                            onChange={(e) =>
+                    </Field>
+
+                    <div className="grid gap-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-sm font-medium">Prerequisites</h3>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={addPrerequisite}
+                        >
+                          <HugeiconsIcon
+                            icon={PlusIcon}
+                            strokeWidth={2}
+                            data-icon="inline-start"
+                          />
+                          Add requirement
+                        </Button>
+                      </div>
+
+                      {prerequisites.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          No prerequisites configured.
+                        </p>
+                      ) : null}
+
+                      {prerequisites.map((item, index) => (
+                        <div
+                          key={item.id}
+                          className="grid gap-3 rounded-2xl border p-3"
+                        >
+                          <Input
+                            placeholder="Requirement label"
+                            value={item.label}
+                            onChange={(event) =>
                               patchPrerequisite(index, {
-                                isRequired: e.target.checked,
+                                label: event.target.value,
                               })
                             }
-                          />{" "}
-                          Required acknowledgement
-                        </label>
-                        <ActionButton
-                          danger
-                          onClick={() =>
-                            setPrerequisites((items) =>
-                              items.filter((_, i) => i !== index),
-                            )
-                          }
-                        >
-                          Remove
-                        </ActionButton>
-                      </div>
+                            required
+                          />
+                          <Input
+                            placeholder="Optional explanation"
+                            value={item.description ?? ""}
+                            onChange={(event) =>
+                              patchPrerequisite(index, {
+                                description: event.target.value,
+                              })
+                            }
+                          />
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <label className="flex cursor-pointer items-center gap-2.5 text-sm">
+                              <Checkbox
+                                checked={item.isRequired}
+                                onCheckedChange={(checked) =>
+                                  patchPrerequisite(index, {
+                                    isRequired: checked === true,
+                                  })
+                                }
+                              />
+                              Required acknowledgement
+                            </label>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              onClick={() =>
+                                setPrerequisites((items) =>
+                                  items.filter((_, i) => i !== index),
+                                )
+                              }
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    disabled={busy}
-                    className="rounded-lg bg-gray-950 px-4 py-2 text-sm text-white"
-                  >
-                    {busy ? "Saving…" : "Save queue"}
-                  </button>
-                  <ActionButton onClick={resetQueueForm}>Cancel</ActionButton>
-                </div>
-              </form>
-            )}
-          </section>
-        )}
 
-        {tab === "live" && (
-          <section className="space-y-5">
-            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-              <div>
-                <h2 className="text-xl font-semibold">Live queue</h2>
-                <p className="mt-1 text-sm text-gray-500">
-                  Live token controls for {service.name}.
-                </p>
-              </div>
-              <div className="sm:w-80">
-                <label className="mb-1 block text-sm font-medium">Queue</label>
-                <select
-                  className={inputClass}
-                  value={selectedQueue?._id ?? ""}
-                  onChange={(e) => setSelectedQueueId(e.target.value)}
-                >
-                  <option value="">Choose a queue</option>
-                  {queues.map((q) => (
-                    <option key={q._id} value={q._id}>
-                      {q.name} · {label(q.status)}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                    <div className="flex gap-2">
+                      <Button type="submit" disabled={busy}>
+                        {busy ? <Spinner data-icon="inline-start" /> : null}
+                        {busy ? "Saving…" : "Save queue"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={resetQueueForm}
+                        disabled={busy}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            ) : null}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="live" className="flex flex-col gap-5 pt-2">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+            <div>
+              <h2 className="font-heading text-xl font-bold tracking-tight">
+                Live queue
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Live token controls for {service.name}.
+              </p>
             </div>
-            {!selectedQueue ? (
-              <div className="rounded-2xl border border-dashed bg-white p-10 text-center">
-                <p className="font-semibold">No queue selected</p>
-                <p className="mt-2 text-sm text-gray-500">
+            <Field className="sm:w-80">
+              <FieldLabel>Queue</FieldLabel>
+              <Select
+                value={selectedQueue?._id ?? ""}
+                onValueChange={(value) => setSelectedQueueId(value ?? "")}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose a queue" />
+                </SelectTrigger>
+                <SelectContent>
+                  {queues.map((q) => (
+                    <SelectItem key={q._id} value={q._id}>
+                      {q.name} · {titleCase(q.status)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+
+          {!selectedQueue ? (
+            <Empty className="border-dashed">
+              <EmptyContent>
+                <EmptyMedia variant="icon">
+                  <HugeiconsIcon icon={Clock01Icon} strokeWidth={2} />
+                </EmptyMedia>
+                <EmptyTitle>No queue selected</EmptyTitle>
+                <EmptyDescription>
                   Create a queue in the Queues tab first.
-                </p>
-                <ActionButton onClick={() => setTab("queues")}>
-                  Configure queues
-                </ActionButton>
-              </div>
-            ) : (
-              <>
-                <div className="flex flex-col justify-between gap-3 rounded-2xl border bg-white p-5 sm:flex-row sm:items-center">
-                  <div>
+                </EmptyDescription>
+              </EmptyContent>
+              <Button size="sm" onClick={() => setTab("queues")}>
+                Configure queues
+              </Button>
+            </Empty>
+          ) : (
+            <>
+              <Card>
+                <CardContent className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                  <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-lg font-semibold">
+                      <h3 className="font-heading text-lg font-bold tracking-tight">
                         {selectedQueue.name}
                       </h3>
-                      <Pill value={selectedQueue.status} />
+                      <Badge
+                        variant={statusVariant(selectedQueue.status)}
+                        className="h-5 rounded-full capitalize"
+                      >
+                        {selectedQueue.status}
+                      </Badge>
                     </div>
-                    <p className="mt-1 text-sm text-gray-500">
+                    <p className="mt-1 text-sm text-muted-foreground">
                       {selectedQueue.description}
                     </p>
                   </div>
-                  <ActionButton
-                    primary
+                  <Button
                     disabled={busy || selectedQueue.status !== "active"}
                     onClick={() => void queueAction("call")}
                   >
-                    Call next customer
-                  </ActionButton>
-                </div>
-                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                  {[
-                    { label: "Waiting", count: waiting },
-                    { label: "Called", count: called },
-                    { label: "Checked in", count: checkedIn },
-                    { label: "In service", count: serving },
-                  ].map((item) => (
-                    <article
-                      key={item.label}
-                      className="rounded-2xl border bg-white p-4"
-                    >
-                      <p className="text-sm text-gray-500">{item.label}</p>
-                      <p className="mt-2 text-3xl font-semibold">
-                        {item.count}
-                      </p>
-                    </article>
-                  ))}
-                </div>
-                <div className="overflow-hidden rounded-2xl border bg-white">
-                  <div className="border-b p-4">
-                    <h3 className="font-semibold">Active tokens</h3>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Realtime status updates from Convex.
-                    </p>
-                  </div>
+                    {busy ? <Spinner data-icon="inline-start" /> : null}
+                    {busy ? "Processing…" : "Call next customer"}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <StatCard label="Waiting" value={waiting} />
+                <StatCard label="Called" value={called} />
+                <StatCard label="Checked in" value={checkedIn} />
+                <StatCard label="In service" value={serving} />
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Active tokens</CardTitle>
+                  <CardDescription>
+                    Realtime status updates from Convex.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
                   {tokens === undefined ? (
-                    <p className="p-5 text-sm text-gray-500">Loading tokens…</p>
+                    <Skeleton className="h-24 w-full rounded-2xl" />
                   ) : tokens.length === 0 ? (
-                    <p className="p-8 text-center text-sm text-gray-500">
+                    <p className="py-6 text-center text-sm text-muted-foreground">
                       No active tokens.
                     </p>
                   ) : (
-                    <div className="divide-y">
+                    <div className="grid gap-3">
                       {tokens.map((token) => (
                         <article
                           key={token._id}
-                          className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center"
+                          className="grid gap-3 rounded-2xl border p-4"
                         >
                           <div className="flex items-start gap-3">
-                            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 font-semibold">
+                            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted font-heading text-sm font-bold">
                               #{token.tokenNumber}
                             </div>
-                            <div>
+                            <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
                                 <p className="font-semibold">
                                   Token #{token.tokenNumber}
                                 </p>
-                                <Pill value={token.status} />
+                                <Badge
+                                  variant={statusVariant(token.status)}
+                                  className="h-5 rounded-full capitalize"
+                                >
+                                  {titleCase(token.status)}
+                                </Badge>
                               </div>
-                              <p className="mt-1 text-sm text-gray-500">
+                              <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+                                <HugeiconsIcon
+                                  icon={Clock01Icon}
+                                  strokeWidth={2}
+                                  data-icon="inline-start"
+                                />
                                 Joined {dateTime(token.joinedAt)}
                               </p>
-                              {token.customerNote && (
+                              {token.customerNote ? (
                                 <p className="mt-1 text-sm">
                                   {token.customerNote}
                                 </p>
-                              )}
+                              ) : null}
                               {token.status === "called" &&
-                                token.graceDeadlineAt && (
-                                  <p className="mt-1 text-xs text-amber-700">
-                                    Check-in deadline{" "}
-                                    {time(token.graceDeadlineAt)}
-                                  </p>
-                                )}
+                              token.graceDeadlineAt ? (
+                                <p className="mt-1 text-xs text-amber-600 dark:text-amber-500">
+                                  Check-in deadline{" "}
+                                  {formatTimeIST(token.graceDeadlineAt)}
+                                </p>
+                              ) : null}
                             </div>
                           </div>
-                          <div className="flex flex-wrap gap-2">
-                            {token.status === "checked_in" && (
-                              <ActionButton
-                                primary
+
+                          <div className="flex flex-wrap gap-2 border-t pt-3">
+                            {token.status === "checked_in" ? (
+                              <Button
+                                size="sm"
                                 disabled={busy}
                                 onClick={() =>
                                   void queueAction("start", token._id)
                                 }
                               >
                                 Start service
-                              </ActionButton>
-                            )}
-                            {token.status === "serving" && (
-                              <ActionButton
-                                primary
+                              </Button>
+                            ) : null}
+                            {token.status === "serving" ? (
+                              <Button
+                                size="sm"
                                 disabled={busy}
                                 onClick={() =>
                                   void queueAction("complete", token._id)
                                 }
                               >
                                 Complete
-                              </ActionButton>
-                            )}
+                              </Button>
+                            ) : null}
                             {["waiting", "called", "checked_in"].includes(
                               token.status,
-                            ) && (
-                              <ActionButton
-                                danger
+                            ) ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                                 disabled={busy}
                                 onClick={() =>
                                   void queueAction("skip", token._id)
                                 }
                               >
                                 Skip
-                              </ActionButton>
-                            )}
+                              </Button>
+                            ) : null}
                           </div>
                         </article>
                       ))}
                     </div>
                   )}
-                </div>
-              </>
-            )}
-          </section>
-        )}
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </TabsContent>
 
-        {tab === "appointments" && (
-          <section className="space-y-5">
-            {!service.appointmentsEnabled && (
-              <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                Appointments are disabled for this service. Enable them in
-                service settings to accept new bookings.
+        <TabsContent value="appointments" className="flex flex-col gap-5 pt-2">
+          {!service.appointmentsEnabled ? (
+            <p className="text-sm text-amber-600 dark:text-amber-500">
+              Appointments are disabled for this service. Enable them in
+              service settings to accept new bookings.
+            </p>
+          ) : null}
+
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+            <div>
+              <h2 className="font-heading text-xl font-bold tracking-tight">
+                Appointments
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Only appointments for {service.name} are displayed.
               </p>
-            )}
-            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-              <div>
-                <h2 className="text-xl font-semibold">Appointments</h2>
-                <p className="mt-1 text-sm text-gray-500">
-                  Only appointments for {service.name} are displayed.
-                </p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm font-medium">Date</label>
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium">
-                    Status
-                  </label>
-                  <select
-                    className={inputClass}
-                    value={appointmentFilter}
-                    onChange={(e) =>
-                      setAppointmentFilter(
-                        e.target.value as "all" | AppointmentStatus,
-                      )
-                    }
-                  >
-                    <option value="all">All statuses</option>
-                    <option value="booked">Booked</option>
-                    <option value="checked_in">Checked in</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
-                    <option value="no_show">No-show</option>
-                  </select>
-                </div>
-              </div>
             </div>
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              {[
-                {
-                  label: "Booked",
-                  count: appointments.filter((a) => a.status === "booked")
-                    .length,
-                },
-                {
-                  label: "Checked in",
-                  count: appointments.filter((a) => a.status === "checked_in")
-                    .length,
-                },
-                {
-                  label: "Completed",
-                  count: appointments.filter((a) => a.status === "completed")
-                    .length,
-                },
-                {
-                  label: "No-shows",
-                  count: appointments.filter((a) => a.status === "no_show")
-                    .length,
-                },
-              ].map((item) => (
-                <article
-                  key={item.label}
-                  className="rounded-2xl border bg-white p-4"
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field>
+                <FieldLabel>Date</FieldLabel>
+                <Input
+                  type="date"
+                  value={date}
+                  onChange={(event) => setDate(event.target.value)}
+                />
+              </Field>
+              <Field>
+                <FieldLabel>Status</FieldLabel>
+                <Select
+                  value={appointmentFilter}
+                  onValueChange={(value) =>
+                    setAppointmentFilter(value as "all" | AppointmentStatus)
+                  }
                 >
-                  <p className="text-sm text-gray-500">{item.label}</p>
-                  <p className="mt-2 text-2xl font-semibold">{item.count}</p>
-                </article>
-              ))}
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All statuses</SelectItem>
+                    <SelectItem value="booked">Booked</SelectItem>
+                    <SelectItem value="checked_in">Checked in</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                    <SelectItem value="no_show">No-show</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
             </div>
-            <div className="overflow-hidden rounded-2xl border bg-white">
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <StatCard
+              label="Booked"
+              value={appointments.filter((a) => a.status === "booked").length}
+            />
+            <StatCard
+              label="Checked in"
+              value={
+                appointments.filter((a) => a.status === "checked_in").length
+              }
+            />
+            <StatCard
+              label="Completed"
+              value={
+                appointments.filter((a) => a.status === "completed").length
+              }
+            />
+            <StatCard
+              label="No-shows"
+              value={appointments.filter((a) => a.status === "no_show").length}
+            />
+          </div>
+
+          <Card>
+            <CardContent>
               {filteredAppointments.length === 0 ? (
-                <p className="p-10 text-center text-sm text-gray-500">
+                <p className="py-10 text-center text-sm text-muted-foreground">
                   No matching appointments for this date.
                 </p>
               ) : (
-                <div className="divide-y">
-                  {filteredAppointments.map((item) => (
-                    <article
-                      key={item._id}
-                      className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center"
-                    >
-                      <div className="flex items-start gap-4">
-                        <div className="rounded-xl bg-gray-50 p-3 text-center">
-                          <p className="font-semibold">
-                            {time(item.scheduledStart)}
-                          </p>
-                          <p className="mt-1 text-xs text-gray-500">
-                            {time(item.scheduledEnd)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="font-semibold">{service.name}</p>
-                          <p className="mt-1 text-sm text-gray-500">
-                            {dateTime(item.scheduledStart)}
-                          </p>
-                          {item.notes && (
-                            <p className="mt-2 text-sm">{item.notes}</p>
-                          )}
-                          <div className="mt-2">
-                            <Pill value={item.status} />
+                <div className="grid gap-3">
+                  {filteredAppointments.map((item) => {
+                    const canMarkNoShow =
+                      item.status === "booked" && now >= item.scheduledEnd;
+
+                    return (
+                      <article
+                        key={item._id}
+                        className="flex flex-col justify-between gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center"
+                      >
+                        <div className="flex items-start gap-4">
+                          <div className="grid gap-1 rounded-xl bg-muted p-3 text-center">
+                            <p className="font-semibold tabular-nums">
+                              {formatTimeIST(item.scheduledStart)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatTimeIST(item.scheduledEnd)}
+                            </p>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold">{service.name}</p>
+                            <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+                              <HugeiconsIcon
+                                icon={Ticket01Icon}
+                                strokeWidth={2}
+                                data-icon="inline-start"
+                              />
+                              {dateTime(item.scheduledStart)}
+                            </p>
+                            {item.notes ? (
+                              <p className="mt-2 text-sm">{item.notes}</p>
+                            ) : null}
+                            <div className="mt-2">
+                              <Badge
+                                variant={statusVariant(item.status)}
+                                className="h-5 rounded-full capitalize"
+                              >
+                                {titleCase(item.status)}
+                              </Badge>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {item.status === "booked" && (
-                          <ActionButton
-                            primary
-                            disabled={busy}
-                            onClick={() =>
-                              void appointmentAction("checkIn", item._id)
-                            }
-                          >
-                            Check in
-                          </ActionButton>
-                        )}
-                        {item.status === "checked_in" && (
-                          <ActionButton
-                            primary
-                            disabled={busy}
-                            onClick={() =>
-                              void appointmentAction("complete", item._id)
-                            }
-                          >
-                            Complete visit
-                          </ActionButton>
-                        )}
-                        {item.status === "booked" &&
-                          Date.now() >= item.scheduledEnd && (
-                            <ActionButton
-                              danger
+
+                        <div className="flex flex-wrap gap-2">
+                          {item.status === "booked" ? (
+                            <Button
+                              size="sm"
+                              disabled={busy}
+                              onClick={() =>
+                                void appointmentAction("checkIn", item._id)
+                              }
+                            >
+                              Check in
+                            </Button>
+                          ) : null}
+                          {item.status === "checked_in" ? (
+                            <Button
+                              size="sm"
+                              disabled={busy}
+                              onClick={() =>
+                                void appointmentAction("complete", item._id)
+                              }
+                            >
+                              Complete visit
+                            </Button>
+                          ) : null}
+                          {canMarkNoShow ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                               disabled={busy}
                               onClick={() =>
                                 void appointmentAction("noShow", item._id)
                               }
                             >
                               Mark no-show
-                            </ActionButton>
-                          )}
-                      </div>
-                    </article>
-                  ))}
+                            </Button>
+                          ) : null}
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
               )}
-            </div>
-          </section>
-        )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-        {tab === "availability" && (
-          <section className="space-y-5">
-            <div>
-              <h2 className="text-xl font-semibold">Availability</h2>
-              <p className="mt-1 text-sm text-gray-500">
-                Calculated from the existing business hours and Convex capacity
-                rules.
-              </p>
-            </div>
-            {!service.appointmentsEnabled ? (
-              <div className="rounded-2xl border bg-white p-8 text-sm text-gray-500">
-                Appointments are disabled for this service.
-              </div>
-            ) : (
-              <>
-                <div className="flex flex-wrap gap-4 rounded-2xl border bg-white p-5">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium">
-                      Date
-                    </label>
-                    <input
+        <TabsContent value="availability" className="flex flex-col gap-5 pt-2">
+          <div>
+            <h2 className="font-heading text-xl font-bold tracking-tight">
+              Availability
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Calculated from the existing business hours and Convex capacity
+              rules.
+            </p>
+          </div>
+
+          {!service.appointmentsEnabled ? (
+            <p className="text-sm text-muted-foreground">
+              Appointments are disabled for this service.
+            </p>
+          ) : (
+            <>
+              <Card>
+                <CardContent className="flex flex-wrap items-end justify-between gap-4">
+                  <Field>
+                    <FieldLabel>Date</FieldLabel>
+                    <Input
                       type="date"
                       value={date}
-                      onChange={(e) => setDate(e.target.value)}
-                      className={inputClass}
+                      min={todayInIST()}
+                      onChange={(event) => setDate(event.target.value)}
+                    />
+                  </Field>
+                  <p className="text-sm text-muted-foreground">
+                    Timezone: Asia/Kolkata (IST)
+                  </p>
+                </CardContent>
+              </Card>
+
+              {availability === undefined ? (
+                <Skeleton className="h-40 w-full rounded-3xl" />
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    <StatCard
+                      label="Daily capacity"
+                      value={
+                        "dailyCapacity" in availability
+                          ? availability.dailyCapacity ?? 0
+                          : 0
+                      }
+                    />
+                    <StatCard
+                      label="Booked appointments"
+                      value={
+                        "bookedAppointments" in availability
+                          ? availability.bookedAppointments ?? 0
+                          : 0
+                      }
+                    />
+                    <StatCard
+                      label="Active queue tokens"
+                      value={
+                        "activeQueueTokens" in availability
+                          ? availability.activeQueueTokens ?? 0
+                          : 0
+                      }
+                    />
+                    <StatCard
+                      label="Remaining capacity"
+                      value={availability.remainingCapacity}
                     />
                   </div>
-                  <div className="self-end text-sm text-gray-500">
-                    Timezone: Asia/Kolkata (IST)
-                  </div>
-                </div>
-                {availability === undefined ? (
-                  <p className="text-sm text-gray-500">
-                    Calculating availability…
-                  </p>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                      {[
-                        {
-                          label: "Daily capacity",
-                          value:
-                            "dailyCapacity" in availability
-                              ? availability.dailyCapacity
-                              : 0,
-                        },
-                        {
-                          label: "Booked appointments",
-                          value:
-                            "bookedAppointments" in availability
-                              ? availability.bookedAppointments
-                              : 0,
-                        },
-                        {
-                          label: "Active queue tokens",
-                          value:
-                            "activeQueueTokens" in availability
-                              ? availability.activeQueueTokens
-                              : 0,
-                        },
-                        {
-                          label: "Remaining capacity",
-                          value: availability.remainingCapacity,
-                        },
-                      ].map((item) => (
-                        <article
-                          key={item.label}
-                          className="rounded-2xl border bg-white p-4"
-                        >
-                          <p className="text-sm text-gray-500">{item.label}</p>
-                          <p className="mt-2 text-2xl font-semibold">
-                            {item.value}
-                          </p>
-                        </article>
-                      ))}
-                    </div>
-                    <div className="rounded-2xl border bg-white p-5">
-                      <div className="flex items-center justify-between gap-3">
-                        <h3 className="font-semibold">Generated time slots</h3>
-                        <span className="text-sm text-gray-500">
-                          {availability.slots.length} slots
-                        </span>
-                      </div>
+
+                  <Card>
+                    <CardHeader className="flex-row items-center justify-between gap-3">
+                      <CardTitle>
+                        <HugeiconsIcon
+                          icon={TimeScheduleIcon}
+                          strokeWidth={2}
+                          data-icon="inline-start"
+                        />
+                        Generated time slots
+                      </CardTitle>
+                      <Badge variant="secondary">
+                        {availability.slots.length} slots
+                      </Badge>
+                    </CardHeader>
+                    <CardContent>
                       {availability.slots.length === 0 ? (
-                        <p className="mt-5 text-sm text-gray-500">
+                        <p className="text-sm text-muted-foreground">
                           No slots generated. Check business opening hours and
                           closures.
                         </p>
                       ) : (
-                        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                           {availability.slots.map((slot) => (
                             <div
                               key={slot.scheduledStart}
-                              className={`rounded-xl border p-3 ${slot.available ? "border-emerald-200 bg-emerald-50" : "bg-gray-50"}`}
+                              className={cn(
+                                "rounded-xl border p-3",
+                                slot.available
+                                  ? "border-emerald-600/30 bg-emerald-500/10"
+                                  : "bg-muted",
+                              )}
                             >
-                              <p className="font-medium">
-                                {time(slot.scheduledStart)}–
-                                {time(slot.scheduledEnd)}
+                              <p className="font-medium tabular-nums">
+                                {formatTimeIST(slot.scheduledStart)}–
+                                {formatTimeIST(slot.scheduledEnd)}
                               </p>
                               <p
-                                className={`mt-2 text-xs ${slot.available ? "text-emerald-700" : "text-gray-500"}`}
+                                className={cn(
+                                  "mt-2 text-xs",
+                                  slot.available
+                                    ? "text-emerald-700 dark:text-emerald-400"
+                                    : "text-muted-foreground",
+                                )}
                               >
                                 {slot.available ? "Available" : "Unavailable"}
                               </p>
@@ -1313,14 +1549,44 @@ export default function ServiceWorkspacePage({
                           ))}
                         </div>
                       )}
-                    </div>
-                  </>
-                )}
-              </>
-            )}
-          </section>
-        )}
-      </div>
-    </main>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogMedia>
+              <HugeiconsIcon icon={TrashIcon} strokeWidth={2} />
+            </AlertDialogMedia>
+            <AlertDialogTitle>Delete {deleteTarget?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the queue and any of its active tokens.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => void handleDeleteQueue()}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }

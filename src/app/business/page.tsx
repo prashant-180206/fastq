@@ -3,62 +3,160 @@
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
+import { AppHeader } from "@/components/layout/app-header";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+} from "@/components/ui/card";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  ArrowUpRight01Icon,
+  Building01Icon,
+  PlusIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { cn } from "cn";
+
+function statusVariant(status: string): "default" | "secondary" | "outline" {
+  if (status === "active") {
+    return "default";
+  }
+  if (status === "suspended") {
+    return "secondary";
+  }
+  return "outline";
+}
 
 export default function BusinessesPage() {
   const businesses = useQuery(api.business.data.getMine, {});
 
   return (
-    <main className="mx-auto max-w-4xl space-y-6 p-6">
-      <header className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Businesses</h1>
-          <p className="text-sm text-gray-500">
-            Manage your businesses and working hours.
-          </p>
-        </div>
+    <>
+      <AppHeader />
 
-        <Link
-          href="/business/new"
-          className="rounded-lg bg-black px-4 py-2 text-sm text-white"
-        >
-          Create business
-        </Link>
-      </header>
+      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="font-heading text-3xl font-bold tracking-tight">
+              Businesses
+            </h1>
+            <p className="mt-1 text-muted-foreground">
+              Manage your businesses and working hours.
+            </p>
+          </div>
 
-      {businesses === undefined ? (
-        <p className="text-sm text-gray-500">Loading businesses...</p>
-      ) : businesses.length === 0 ? (
-        <div className="rounded-xl border border-dashed p-10 text-center">
-          <h2 className="font-medium">No businesses yet</h2>
-          <p className="mt-2 text-sm text-gray-500">
-            Create your first business to get started.
-          </p>
           <Link
             href="/business/new"
-            className="mt-4 inline-block text-sm underline"
+            className={cn(buttonVariants())}
           >
-            Create a business
+            <HugeiconsIcon icon={PlusIcon} strokeWidth={2} data-icon="inline-start" />
+            Create business
           </Link>
         </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {businesses.map((business) => (
-            <Link
-              key={business._id}
-              href={`/business/${business._id}`}
-              className="rounded-xl border p-5 transition hover:bg-gray-50"
-            >
-              <h2 className="font-semibold">{business.name}</h2>
-              <p className="mt-1 text-sm text-gray-500">
-                {business.description || "No description"}
-              </p>
-              <p className="mt-3 text-xs capitalize text-gray-500">
-                {business.status}
-              </p>
-            </Link>
-          ))}
-        </div>
-      )}
-    </main>
+
+        {businesses === undefined ? (
+          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Card key={index}>
+                <CardContent className="flex items-center gap-4 p-5">
+                  <Skeleton className="size-10 rounded-xl" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-full" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : businesses.length === 0 ? (
+          <div className="mt-8">
+            <Empty>
+              <EmptyContent>
+                <EmptyMedia variant="icon">
+                  <HugeiconsIcon icon={Building01Icon} strokeWidth={2} />
+                </EmptyMedia>
+                <EmptyTitle>No businesses yet</EmptyTitle>
+                <EmptyDescription>
+                  Create your first business to start managing queues and
+                  appointment bookings.
+                </EmptyDescription>
+              </EmptyContent>
+
+              <div className="flex justify-center">
+                <Link
+                  href="/business/new"
+                  className={cn(buttonVariants())}
+                >
+                  <HugeiconsIcon icon={PlusIcon} strokeWidth={2} data-icon="inline-start" />
+                  Create a business
+                </Link>
+              </div>
+            </Empty>
+          </div>
+        ) : (
+          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+            {businesses.map((business) => {
+              const initials = (business.name ?? "?")
+                .split(" ")
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((part) => part[0])
+                .join("")
+                .toUpperCase();
+
+              return (
+                <Link
+                  key={business._id}
+                  href={`/business/${business._id}`}
+                  className="group"
+                >
+                  <Card className="h-full transition-colors group-hover:border-ring group-hover:bg-accent/40">
+                    <CardContent className="flex items-start gap-4 p-5">
+                      <Avatar className="size-10 shrink-0 rounded-xl">
+                        <AvatarFallback className="rounded-xl text-sm">
+                          {initials}
+                        </AvatarFallback>
+                      </Avatar>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <h2 className="truncate font-medium">{business.name}</h2>
+                          <Badge
+                            variant={statusVariant(business.status)}
+                            className="h-5 rounded-full capitalize"
+                          >
+                            {business.status}
+                          </Badge>
+                        </div>
+                        <CardDescription className="mt-1 line-clamp-2">
+                          {business.description || "No description added."}
+                        </CardDescription>
+                      </div>
+
+                      <HugeiconsIcon
+                        icon={ArrowUpRight01Icon}
+                        strokeWidth={2}
+                        className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
+                      />
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </main>
+    </>
   );
 }

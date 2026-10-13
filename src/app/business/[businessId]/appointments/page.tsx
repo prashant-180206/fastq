@@ -5,26 +5,55 @@ import { use, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import { formatShortDateIST, formatTimeIST, todayInIST } from "@/lib/format";
+import { notifyError, notifySuccess } from "@/lib/toast";
+import {
+  ArrowUpRight01Icon,
+  Calendar02Icon,
+  Ticket01Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { cn } from "cn";
 
-function todayInIST() {
-  return new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
-}
-
-function formatTime(timestamp: number) {
-  return new Intl.DateTimeFormat("en-IN", {
-    timeZone: "Asia/Kolkata",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(timestamp);
-}
-
-function formatDate(timestamp: number) {
-  return new Intl.DateTimeFormat("en-IN", {
-    timeZone: "Asia/Kolkata",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(timestamp);
+function appointmentVariant(
+  status: string,
+): "default" | "secondary" | "destructive" | "outline" | "ghost" {
+  if (status === "checked_in") {
+    return "default";
+  }
+  if (status === "completed" || status === "cancelled") {
+    return "secondary";
+  }
+  if (status === "no_show") {
+    return "destructive";
+  }
+  return "outline";
 }
 
 export default function BusinessAppointmentsPage({
@@ -37,7 +66,6 @@ export default function BusinessAppointmentsPage({
 
   const [selectedDate, setSelectedDate] = useState(todayInIST());
   const [statusFilter, setStatusFilter] = useState("all");
-  const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const appointments = useQuery(api.business.appointments.getByBusiness, {
@@ -53,29 +81,31 @@ export default function BusinessAppointmentsPage({
   const complete = useMutation(api.business.appointments.complete);
   const markNoShow = useMutation(api.business.appointments.markNoShow);
 
-  const serviceName = (serviceId: Id<"services">) =>
-    services?.find((service) => service._id === serviceId)?.name ?? "Service";
+  const serviceName = (serviceDbId: Id<"services">) =>
+    services?.find((service) => service._id === serviceDbId)?.name ?? "Service";
 
   async function runAction(
     appointmentId: Id<"appointments">,
     action: "checkIn" | "complete" | "noShow",
   ) {
-    setError("");
     setBusyId(appointmentId);
-
     try {
       if (action === "checkIn") {
         await checkIn({ appointmentId });
+        notifySuccess("Checked in");
       } else if (action === "complete") {
         await complete({ appointmentId });
+        notifySuccess("Visit completed");
       } else {
         await markNoShow({ appointmentId });
+        notifySuccess("Marked as no-show");
       }
     } catch (error) {
-      setError(
+      notifyError(
+        "Could not update appointment",
         error instanceof Error
           ? error.message
-          : "The appointment could not be updated.",
+          : "Please try again.",
       );
     } finally {
       setBusyId(null);
@@ -100,169 +130,198 @@ export default function BusinessAppointmentsPage({
   ).length;
 
   return (
-    <main className="mx-auto max-w-6xl space-y-6 p-6">
-      <Link
-        href={`/business/${businessId}`}
-        className="text-sm text-gray-500 hover:underline"
-      >
-        ← Back to business
-      </Link>
-
-      <header className="flex flex-wrap items-start justify-between gap-4">
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold">Appointments</h1>
-          <p className="mt-2 text-sm text-gray-500">
+          <h1 className="font-heading text-3xl font-bold tracking-tight">
+            Appointments
+          </h1>
+          <p className="mt-1 text-muted-foreground">
             Review bookings and manage customer visits.
           </p>
         </div>
 
         <Link
           href={`/business/${businessId}/schedule`}
-          className="rounded-lg border px-4 py-2 text-sm"
+          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
         >
-          View schedule →
-        </Link>
-      </header>
-
-      <section className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border p-4">
-          <p className="text-sm text-gray-500">Booked</p>
-          <p className="mt-2 text-2xl font-semibold">{bookedCount}</p>
-        </div>
-
-        <div className="rounded-xl border p-4">
-          <p className="text-sm text-gray-500">Checked in</p>
-          <p className="mt-2 text-2xl font-semibold">{checkedInCount}</p>
-        </div>
-
-        <div className="rounded-xl border p-4">
-          <p className="text-sm text-gray-500">Completed</p>
-          <p className="mt-2 text-2xl font-semibold">{completedCount}</p>
-        </div>
-      </section>
-
-      <section className="flex flex-wrap items-end gap-4 rounded-xl border p-4">
-        <label className="grid gap-2 text-sm">
-          <span className="font-medium">Appointment date</span>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(event) => setSelectedDate(event.target.value)}
-            className="rounded-lg border px-3 py-2"
+          View schedule
+          <HugeiconsIcon
+            icon={ArrowUpRight01Icon}
+            strokeWidth={2}
+            data-icon="inline-end"
           />
-        </label>
+        </Link>
+      </div>
 
-        <label className="grid gap-2 text-sm">
-          <span className="font-medium">Status</span>
-          <select
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-            className="rounded-lg border px-3 py-2"
-          >
-            <option value="all">All statuses</option>
-            <option value="booked">Booked</option>
-            <option value="checked_in">Checked in</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-            <option value="no_show">No-show</option>
-          </select>
-        </label>
+      <section className="grid gap-3 sm:grid-cols-3">
+        {[
+          ["Booked", bookedCount],
+          ["Checked in", checkedInCount],
+          ["Completed", completedCount],
+        ].map(([label, count]) => (
+          <Card key={label}>
+            <CardHeader>
+              <CardTitle className="text-sm font-normal text-muted-foreground">
+                {label}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="font-heading text-3xl font-bold tracking-tight">
+                {count}
+              </p>
+            </CardContent>
+          </Card>
+        ))}
       </section>
 
-      {error && (
-        <div
-          role="alert"
-          className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700"
-        >
-          {error}
-        </div>
-      )}
+      <Card>
+        <CardHeader className="grid gap-4 sm:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="appointment-date">
+              Appointment date
+            </FieldLabel>
+            <Input
+              id="appointment-date"
+              type="date"
+              value={selectedDate}
+              onChange={(event) => setSelectedDate(event.target.value)}
+            />
+          </Field>
+
+          <Field>
+            <FieldLabel htmlFor="appointment-status">Status</FieldLabel>
+            <Select
+              value={statusFilter}
+              onValueChange={(value) => setStatusFilter(value ?? "all")}
+            >
+              <SelectTrigger id="appointment-status" className="w-full">
+                <SelectValue placeholder="All statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="booked">Booked</SelectItem>
+                <SelectItem value="checked_in">Checked in</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+                <SelectItem value="no_show">No-show</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+        </CardHeader>
+      </Card>
 
       {appointments === undefined || services === undefined ? (
-        <p className="text-sm text-gray-500">Loading appointments...</p>
-      ) : filteredAppointments.length === 0 ? (
-        <div className="rounded-xl border p-8 text-center">
-          <h2 className="font-medium">No appointments found</h2>
-          <p className="mt-2 text-sm text-gray-500">
-            Try another date or status filter.
-          </p>
+        <div className="flex flex-col gap-3">
+          <Skeleton className="h-9 w-72" />
+          <Skeleton className="h-9 w-56" />
+          <Skeleton className="h-28 rounded-3xl" />
         </div>
+      ) : filteredAppointments.length === 0 ? (
+        <Empty className="border-dashed">
+          <EmptyContent>
+            <EmptyMedia variant="icon">
+              <HugeiconsIcon icon={Calendar02Icon} strokeWidth={2} />
+            </EmptyMedia>
+            <EmptyTitle>No appointments found</EmptyTitle>
+            <EmptyDescription>
+              Try another date or status filter.
+            </EmptyDescription>
+          </EmptyContent>
+        </Empty>
       ) : (
-        <section className="space-y-3">
+        <div className="flex flex-col gap-3">
           {filteredAppointments.map((appointment) => (
-            <article
-              key={appointment._id}
-              className="flex flex-col gap-4 rounded-xl border p-5 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="font-semibold">
-                    {serviceName(appointment.serviceId)}
-                  </h2>
+            <Card key={appointment._id} size="sm">
+              <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 grid gap-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="font-semibold">
+                      {serviceName(appointment.serviceId)}
+                    </h2>
+                    <Badge
+                      variant={appointmentVariant(appointment.status)}
+                      className="h-5 rounded-full capitalize"
+                    >
+                      {appointment.status.replace("_", " ")}
+                    </Badge>
+                  </div>
 
-                  <span className="rounded-full border px-2.5 py-1 text-xs capitalize">
-                    {appointment.status.replace("_", " ")}
-                  </span>
+                  <p className="text-sm text-muted-foreground">
+                    {formatTimeIST(appointment.scheduledStart)} –{" "}
+                    {formatTimeIST(appointment.scheduledEnd)}
+                    {" · "}
+                    {formatShortDateIST(appointment.scheduledStart)}
+                  </p>
+
+                  <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <HugeiconsIcon
+                      icon={Ticket01Icon}
+                      strokeWidth={2}
+                      data-icon="inline-start"
+                    />
+                    Booking ID: {appointment._id}
+                  </p>
+
+                  {appointment.notes ? (
+                    <p className="text-sm text-muted-foreground">
+                      Note: {appointment.notes}
+                    </p>
+                  ) : null}
                 </div>
 
-                <p className="text-sm text-gray-600">
-                  {formatTime(appointment.scheduledStart)} –{" "}
-                  {formatTime(appointment.scheduledEnd)}
-                  {" · "}
-                  {formatDate(appointment.scheduledStart)}
-                </p>
+                <div className="flex flex-wrap gap-2">
+                  {appointment.status === "booked" ? (
+                    <>
+                      <Button
+                        size="sm"
+                        disabled={busyId === appointment._id}
+                        onClick={() =>
+                          void runAction(appointment._id, "checkIn")
+                        }
+                      >
+                        {busyId === appointment._id ? (
+                          <Spinner data-icon="inline-start" />
+                        ) : null}
+                        {busyId === appointment._id ? "Updating…" : "Check in"}
+                      </Button>
 
-                <p className="text-xs text-gray-500">
-                  Booking ID: {appointment._id}
-                </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        disabled={busyId === appointment._id}
+                        onClick={() =>
+                          void runAction(appointment._id, "noShow")
+                        }
+                      >
+                        Mark no-show
+                      </Button>
+                    </>
+                  ) : null}
 
-                {appointment.notes && (
-                  <p className="text-sm text-gray-600">
-                    Note: {appointment.notes}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {appointment.status === "booked" && (
-                  <>
-                    <button
-                      type="button"
+                  {appointment.status === "checked_in" ? (
+                    <Button
+                      size="sm"
                       disabled={busyId === appointment._id}
-                      onClick={() => runAction(appointment._id, "checkIn")}
-                      className="rounded-lg bg-black px-3 py-2 text-sm text-white disabled:opacity-50"
+                      onClick={() =>
+                        void runAction(appointment._id, "complete")
+                      }
                     >
-                      {busyId === appointment._id ? "Updating..." : "Check in"}
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={busyId === appointment._id}
-                      onClick={() => runAction(appointment._id, "noShow")}
-                      className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50"
-                    >
-                      Mark no-show
-                    </button>
-                  </>
-                )}
-
-                {appointment.status === "checked_in" && (
-                  <button
-                    type="button"
-                    disabled={busyId === appointment._id}
-                    onClick={() => runAction(appointment._id, "complete")}
-                    className="rounded-lg bg-black px-3 py-2 text-sm text-white disabled:opacity-50"
-                  >
-                    {busyId === appointment._id
-                      ? "Updating..."
-                      : "Complete visit"}
-                  </button>
-                )}
-              </div>
-            </article>
+                      {busyId === appointment._id ? (
+                        <Spinner data-icon="inline-start" />
+                      ) : null}
+                      {busyId === appointment._id
+                        ? "Updating…"
+                        : "Complete visit"}
+                    </Button>
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
           ))}
-        </section>
+        </div>
       )}
-    </main>
+    </div>
   );
 }

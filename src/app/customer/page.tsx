@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
-import { AppHeader } from "@/components/layout/app-header";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -118,7 +117,7 @@ function BusinessCardSkeleton() {
   );
 }
 
-export default function DiscoverPage() {
+export default function CustomerHomePage() {
   const businesses = useQuery(api.business.data.getAll, {});
   const [query, setQuery] = useState("");
 
@@ -143,104 +142,100 @@ export default function DiscoverPage() {
   const hasBusinesses = businesses !== undefined && businesses.length > 0;
 
   return (
-    <div className="min-h-dvh bg-background text-foreground">
-      <AppHeader />
+    <div className="flex flex-col gap-8">
+      <section className="pt-4 sm:pt-8">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+              Discover businesses
+            </h1>
+            {businesses !== undefined && (
+              <Badge variant="secondary" className="rounded-full">
+                {businesses.length}{" "}
+                {businesses.length === 1 ? "business" : "businesses"}
+              </Badge>
+            )}
+          </div>
+          <p className="max-w-2xl text-base leading-7 text-muted-foreground">
+            Find businesses around you, check what they offer, and join
+            their queue or book an appointment in a few taps.
+          </p>
 
-      <main className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
-        <section className="pt-12 sm:pt-16">
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                Discover businesses
-              </h1>
-              {businesses !== undefined && (
-                <Badge variant="secondary" className="rounded-full">
-                  {businesses.length}{" "}
-                  {businesses.length === 1 ? "business" : "businesses"}
-                </Badge>
-              )}
-            </div>
-            <p className="max-w-2xl text-base leading-7 text-muted-foreground">
-              Find businesses around you, check what they offer, and join
-              their queue or book an appointment in a few taps.
-            </p>
+          <div className="relative mt-2 max-w-md">
+            <HugeiconsIcon
+              icon={Search01Icon}
+              strokeWidth={2}
+              className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search businesses, services…"
+              aria-label="Search businesses"
+              className="pl-10"
+            />
+          </div>
+        </div>
+      </section>
 
-            <div className="relative mt-2 max-w-md">
-              <HugeiconsIcon
-                icon={Search01Icon}
-                strokeWidth={2}
-                className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground"
-              />
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search businesses, services…"
-                aria-label="Search businesses"
-                className="pl-10"
-              />
-            </div>
+      {filtered === undefined ? (
+        <section aria-label="Loading businesses">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <BusinessCardSkeleton key={index} />
+            ))}
           </div>
         </section>
-
-        {filtered === undefined ? (
-          <section aria-label="Loading businesses" className="pt-10">
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <BusinessCardSkeleton key={index} />
-              ))}
-            </div>
-          </section>
-        ) : filtered.length === 0 ? (
-          <section className="pt-10">
-            <Empty>
-              <EmptyContent>
-                <EmptyMedia variant="icon">
-                  <HugeiconsIcon
-                    icon={hasBusinesses ? Search01Icon : Store01Icon}
-                    strokeWidth={2}
-                  />
-                </EmptyMedia>
-                <EmptyTitle>
-                  {hasBusinesses
-                    ? "No businesses match your search"
-                    : "No businesses yet"}
-                </EmptyTitle>
-                <EmptyDescription>
-                  {hasBusinesses
-                    ? "Try a different name or keyword to find what you are looking for."
-                    : "Be the first to list your business and let customers discover you on QuiLess."}
-                </EmptyDescription>
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                  {hasBusinesses ? (
-                    <button
-                      type="button"
-                      onClick={() => setQuery("")}
-                      className={cn(buttonVariants({ variant: "outline" }))}
-                    >
-                      Clear search
-                    </button>
-                  ) : (
-                    <Link
-                      href="/business/new"
-                      className={cn(buttonVariants())}
-                    >
-                      Add your business
-                    </Link>
-                  )}
-                </div>
-              </EmptyContent>
-            </Empty>
-          </section>
-        ) : (
-          <section aria-label="Businesses" className="pt-10">
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {filtered.map((business) => (
-                <BusinessCard key={business._id} business={business} />
-              ))}
-            </div>
-          </section>
-        )}
-      </main>
+      ) : filtered.length === 0 ? (
+        <section>
+          <Empty className="border-dashed">
+            <EmptyContent>
+              <EmptyMedia variant="icon">
+                <HugeiconsIcon
+                  icon={hasBusinesses ? Search01Icon : Store01Icon}
+                  strokeWidth={2}
+                />
+              </EmptyMedia>
+              <EmptyTitle>
+                {hasBusinesses
+                  ? "No businesses match your search"
+                  : "No businesses yet"}
+              </EmptyTitle>
+              <EmptyDescription>
+                {hasBusinesses
+                  ? "Try a different name or keyword to find what you are looking for."
+                  : "Be the first to list your business and let customers discover you on QuiLess."}
+              </EmptyDescription>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                {hasBusinesses ? (
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    className={cn(buttonVariants({ variant: "outline" }))}
+                  >
+                    Clear search
+                  </button>
+                ) : (
+                  <Link
+                    href="/business/new"
+                    className={cn(buttonVariants())}
+                  >
+                    Add your business
+                  </Link>
+                )}
+              </div>
+            </EmptyContent>
+          </Empty>
+        </section>
+      ) : (
+        <section aria-label="Businesses">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((business) => (
+              <BusinessCard key={business._id} business={business} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

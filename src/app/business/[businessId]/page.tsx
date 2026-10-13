@@ -5,6 +5,69 @@ import { use } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
+import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  ArrowUpRight01Icon,
+  Building01Icon,
+  Clock01Icon,
+  Mail01Icon,
+  PhoneIcon,
+  PlusIcon,
+  Ticket01Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { cn } from "cn";
+
+function statusVariant(status: string): "default" | "secondary" | "outline" {
+  if (status === "active") {
+    return "default";
+  }
+  if (status === "suspended") {
+    return "secondary";
+  }
+  return "outline";
+}
+
+function StatCard({
+  icon,
+  label,
+  children,
+  action,
+}: {
+  icon: typeof Clock01Icon;
+  label: string;
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <HugeiconsIcon icon={icon} strokeWidth={2} className="size-4" />
+          {label}
+        </div>
+        <div className="mt-2 text-foreground">{children}</div>
+        {action ? <div className="mt-3">{action}</div> : null}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function BusinessDetailPage({
   params,
@@ -17,21 +80,45 @@ export default function BusinessDetailPage({
   const business = useQuery(api.business.data.getById, {
     businessId: id,
   });
-
   const queues = useQuery(api.business.queue.getByBusiness, {
     businessId: id,
   });
-
   const services = useQuery(api.business.services.getByBusiness, {
     businessId: id,
   });
 
   if (business === undefined) {
-    return <main className="p-6">Loading business...</main>;
+    return (
+      <div className="flex flex-col gap-8">
+        <div className="space-y-2">
+          <Skeleton className="h-9 w-64" />
+          <Skeleton className="h-4 w-full max-w-md" />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton key={index} className="h-32 rounded-3xl" />
+          ))}
+        </div>
+        <Skeleton className="h-44 rounded-3xl" />
+        <Skeleton className="h-44 rounded-3xl" />
+      </div>
+    );
   }
 
   if (business === null) {
-    return <main className="p-6">Business not found.</main>;
+    return (
+      <Empty>
+        <EmptyContent>
+          <EmptyMedia variant="icon">
+            <HugeiconsIcon icon={Building01Icon} strokeWidth={2} />
+          </EmptyMedia>
+          <EmptyTitle>Business not found</EmptyTitle>
+          <EmptyDescription>
+            This business does not exist or you do not have access to it.
+          </EmptyDescription>
+        </EmptyContent>
+      </Empty>
+    );
   }
 
   const configuredDays = business.businessHours?.filter(
@@ -39,203 +126,266 @@ export default function BusinessDetailPage({
   ).length;
 
   return (
-    <main className="mx-auto max-w-4xl space-y-6 p-6">
-      <Link href="/business" className="text-sm text-gray-500 hover:underline">
-        ← All businesses
-      </Link>
-
-      <header>
-        <h1 className="text-3xl font-semibold">{business.name}</h1>
-        <p className="mt-2 text-sm text-gray-500">
-          {business.description || "No description added."}
-        </p>
-      </header>
-
-      <section className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-xl border p-5">
-          <p className="text-sm text-gray-500">Status</p>
-          <p className="mt-2 font-medium capitalize">{business.status}</p>
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="font-heading text-3xl font-bold tracking-tight">
+            {business.name}
+          </h1>
+          <p className="mt-1 max-w-2xl text-muted-foreground">
+            {business.description || "No description added."}
+          </p>
         </div>
 
-        <div className="rounded-xl border p-5">
-          <p className="text-sm text-gray-500">Working hours</p>
-          <p className="mt-2 font-medium">
+        <Link
+          href={`/b/${business._id}`}
+          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+        >
+          View public page
+          <HugeiconsIcon
+            icon={ArrowUpRight01Icon}
+            strokeWidth={2}
+            data-icon="inline-end"
+          />
+        </Link>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <StatCard icon={Building01Icon} label="Status">
+          <Badge
+            variant={statusVariant(business.status)}
+            className="rounded-full capitalize"
+          >
+            {business.status}
+          </Badge>
+        </StatCard>
+
+        <StatCard icon={Clock01Icon} label="Working hours">
+          <span className="font-medium">
             {business.businessHours
               ? `${configuredDays} open days configured`
               : "Not configured"}
-          </p>
-          <Link
-            href={`/business/${business._id}/working-hours`}
-            className="mt-3 inline-block text-sm underline"
-          >
-            Configure working hours →
-          </Link>
-        </div>
-
-        <div className="rounded-xl border p-5">
-          <p className="text-sm text-gray-500">Contact email</p>
-          <p className="mt-2">{business.contactEmail || "Not provided"}</p>
-        </div>
-
-        <div className="rounded-xl border p-5">
-          <p className="text-sm text-gray-500">Phone</p>
-          <p className="mt-2">{business.phone || "Not provided"}</p>
-        </div>
-      </section>
-
-      {/* Services */}
-      <section className="space-y-4 rounded-xl border p-5">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="font-semibold">Services</h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Configure service duration and booking methods.
-            </p>
+          </span>
+          <div className="mt-3">
+            <Link
+              href={`/business/${business._id}/working-hours`}
+              className="text-sm font-medium text-primary hover:underline"
+            >
+              Configure working hours
+            </Link>
           </div>
+        </StatCard>
 
+        <StatCard icon={Mail01Icon} label="Contact email">
+          <span className="break-all text-sm font-medium">
+            {business.contactEmail || "Not provided"}
+          </span>
+        </StatCard>
+
+        <StatCard icon={PhoneIcon} label="Phone">
+          <span className="text-sm font-medium">
+            {business.phone || "Not provided"}
+          </span>
+        </StatCard>
+      </div>
+
+      <Card>
+        <CardHeader className="flex-row items-start justify-between gap-4">
+          <div>
+            <CardTitle>Services</CardTitle>
+            <CardDescription>
+              Configure service duration and booking methods.
+            </CardDescription>
+          </div>
           <Link
             href={`/business/${business._id}/services`}
-            className="shrink-0 rounded-lg bg-black px-4 py-2 text-sm text-white"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
           >
+            <HugeiconsIcon icon={PlusIcon} strokeWidth={2} data-icon="inline-start" />
             Manage services
           </Link>
-        </div>
-
-        {services === undefined ? (
-          <p className="text-sm text-gray-500">Loading services...</p>
-        ) : services.length === 0 ? (
-          <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">
-            No services created yet. Add a service before assigning it to queues
-            or enabling appointments.
-          </p>
-        ) : (
-          <div className="divide-y">
-            {services.map((service) => (
-              <div
-                key={service._id}
-                className="flex flex-wrap items-center justify-between gap-3 py-4"
-              >
-                <div>
-                  <h3 className="font-medium">{service.name}</h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    {service.description || "No description"}
-                  </p>
-                  <p className="mt-1 text-sm text-gray-500">
-                    {service.durationMinutes} minutes per customer
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                    {service.queueEnabled && (
-                      <span className="rounded-full border px-2 py-1">
-                        Queue enabled
-                      </span>
-                    )}
-                    {service.appointmentsEnabled && (
-                      <span className="rounded-full border px-2 py-1">
-                        Appointments enabled
-                      </span>
-                    )}
-                    {!service.queueEnabled && !service.appointmentsEnabled && (
-                      <span className="rounded-full border px-2 py-1">
-                        No booking method
-                      </span>
-                    )}
+        </CardHeader>
+        <CardContent>
+          {services === undefined ? (
+            <div className="grid gap-3">
+              {Array.from({ length: 2 }).map((_, index) => (
+                <Skeleton key={index} className="h-16 rounded-2xl" />
+              ))}
+            </div>
+          ) : services.length === 0 ? (
+            <Empty className="border-dashed">
+              <EmptyContent>
+                <EmptyDescription>
+                  No services yet. Add a service before assigning it to queues
+                  or enabling appointments.
+                </EmptyDescription>
+              </EmptyContent>
+            </Empty>
+          ) : (
+            <div className="divide-y">
+              {services.map((service) => (
+                <div
+                  key={service._id}
+                  className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="truncate font-medium">{service.name}</h3>
+                      <Badge variant="outline" className="h-5 rounded-full">
+                        {service.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                    {service.description ? (
+                      <p className="mt-0.5 text-sm text-muted-foreground">
+                        {service.description}
+                      </p>
+                    ) : null}
+                    <p className="mt-0.5 text-sm text-muted-foreground">
+                      {service.durationMinutes} minutes per customer
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {service.queueEnabled ? (
+                        <Badge
+                          variant="secondary"
+                          className="h-5 gap-1 rounded-full"
+                        >
+                          <HugeiconsIcon
+                            icon={Ticket01Icon}
+                            strokeWidth={2}
+                            className="size-3"
+                          />
+                          Queue
+                        </Badge>
+                      ) : null}
+                      {service.appointmentsEnabled ? (
+                        <Badge
+                          variant="secondary"
+                          className="h-5 rounded-full"
+                        >
+                          Appointments
+                        </Badge>
+                      ) : null}
+                      {!service.queueEnabled &&
+                      !service.appointmentsEnabled ? (
+                        <Badge variant="secondary" className="h-5 rounded-full">
+                          No booking method
+                        </Badge>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-                <span className="rounded-full border px-3 py-1 text-xs">
-                  {service.isActive ? "Active" : "Inactive"}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Queues */}
-      <section className="space-y-4 rounded-xl border p-5">
-        <div className="flex items-center justify-between gap-3">
+      <Card>
+        <CardHeader className="flex-row items-start justify-between gap-4">
           <div>
-            <h2 className="font-semibold">Queues</h2>
-            <p className="mt-1 text-sm text-gray-500">
+            <CardTitle>Queues</CardTitle>
+            <CardDescription>
               Manage waiting lines and customer prerequisites.
-            </p>
+            </CardDescription>
           </div>
-
           <Link
             href={`/business/${business._id}/queues`}
-            className="shrink-0 rounded-lg border px-4 py-2 text-sm"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
           >
+            <HugeiconsIcon icon={PlusIcon} strokeWidth={2} data-icon="inline-start" />
             Manage queues
           </Link>
-        </div>
-
-        {queues === undefined ? (
-          <p className="text-sm text-gray-500">Loading queues...</p>
-        ) : queues.length === 0 ? (
-          <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">
-            No queues created yet.
-          </p>
-        ) : (
-          <div className="divide-y">
-            {queues.map((queue) => (
-              <div
-                key={queue._id}
-                className="flex items-center justify-between gap-3 py-4"
-              >
-                <div>
-                  <h3 className="font-medium">{queue.name}</h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    {queue.description}
-                  </p>
-                  <p className="mt-1 text-xs text-gray-500">
-                    {queue.prerequisites.length} prerequisites
-                  </p>
+        </CardHeader>
+        <CardContent>
+          {queues === undefined ? (
+            <div className="grid gap-3">
+              {Array.from({ length: 2 }).map((_, index) => (
+                <Skeleton key={index} className="h-16 rounded-2xl" />
+              ))}
+            </div>
+          ) : queues.length === 0 ? (
+            <Empty className="border-dashed">
+              <EmptyContent>
+                <EmptyDescription>
+                  No queues yet. Create a queue and link it to a service.
+                </EmptyDescription>
+              </EmptyContent>
+            </Empty>
+          ) : (
+            <div className="divide-y">
+              {queues.map((queue) => (
+                <div
+                  key={queue._id}
+                  className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                >
+                  <div className="min-w-0">
+                    <h3 className="truncate font-medium">{queue.name}</h3>
+                    {queue.description ? (
+                      <p className="mt-0.5 text-sm text-muted-foreground">
+                        {queue.description}
+                      </p>
+                    ) : null}
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {queue.prerequisites.length} prerequisites
+                    </p>
+                  </div>
+                  <Badge
+                    variant={statusVariant(queue.status)}
+                    className="rounded-full capitalize"
+                  >
+                    {queue.status}
+                  </Badge>
                 </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-                <span className="rounded-full border px-3 py-1 text-xs capitalize">
-                  {queue.status}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="rounded-xl border p-5">
-        <h2 className="font-semibold">Business settings</h2>
-        <p className="mt-1 text-sm text-gray-500">
-          Configure your regular operating schedule.
-        </p>
-        <Link
-          href={`/business/${business._id}/working-hours`}
-          className="mt-4 inline-block rounded-lg border px-4 py-2 text-sm"
-        >
-          Manage working hours
-        </Link>
-      </section>
-
-      {/* Appointments and schedule */}
-      <section className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         <Link
           href={`/business/${business._id}/appointments`}
-          className="rounded-xl border p-5 transition hover:bg-gray-50"
+          className="group"
         >
-          <h2 className="font-semibold">Appointments →</h2>
-          <p className="mt-2 text-sm text-gray-500">
-            View bookings, check customers in, and manage visit statuses.
-          </p>
+          <Card className="h-full transition-colors group-hover:border-ring group-hover:bg-accent/40">
+            <CardContent className="flex items-start justify-between gap-4 p-5">
+              <div>
+                <h2 className="font-medium">Appointments</h2>
+                <CardDescription className="mt-1">
+                  View bookings, check customers in, and manage visit statuses.
+                </CardDescription>
+              </div>
+              <HugeiconsIcon
+                icon={ArrowUpRight01Icon}
+                strokeWidth={2}
+                className="mt-1 size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
+              />
+            </CardContent>
+          </Card>
         </Link>
 
         <Link
           href={`/business/${business._id}/schedule`}
-          className="rounded-xl border p-5 transition hover:bg-gray-50"
+          className="group"
         >
-          <h2 className="font-semibold">Daily schedule →</h2>
-          <p className="mt-2 text-sm text-gray-500">
-            Review operating hours and the day's appointment timeline.
-          </p>
+          <Card className="h-full transition-colors group-hover:border-ring group-hover:bg-accent/40">
+            <CardContent className="flex items-start justify-between gap-4 p-5">
+              <div>
+                <h2 className="font-medium">Daily schedule</h2>
+                <CardDescription className="mt-1">
+                  Review operating hours and the day&apos;s appointment
+                  timeline.
+                </CardDescription>
+              </div>
+              <HugeiconsIcon
+                icon={ArrowUpRight01Icon}
+                strokeWidth={2}
+                className="mt-1 size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
+              />
+            </CardContent>
+          </Card>
         </Link>
-      </section>
-    </main>
+      </div>
+    </div>
   );
 }

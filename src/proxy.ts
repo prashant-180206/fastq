@@ -7,7 +7,6 @@ import {
 
 const isProtectedRoute = createRouteMatcher([
   "/business(.*)",
-  "/discover(.*)",
   "/customer(.*)",
   "/cb(.*)",
 ]);
@@ -28,7 +27,7 @@ export default convexAuthNextjsMiddleware(
 
     // Redirect signed-in users away from login/signup
     if (isAuthRoute(request) && isAuthenticated) {
-      return nextjsMiddlewareRedirect(request, "/discover");
+      return nextjsMiddlewareRedirect(request, "/customer");
     }
   },
   {

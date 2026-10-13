@@ -5,6 +5,31 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation } from "convex/react";
 import { api } from "@/../convex/_generated/api";
+import { AppHeader } from "@/components/layout/app-header";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Field,
+  FieldDescription,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
+import { ArrowLeft01Icon, Store01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { cn } from "cn";
 
 export default function NewBusinessPage() {
   const router = useRouter();
@@ -33,7 +58,7 @@ export default function NewBusinessPage() {
       router.push(`/business/${businessId}`);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Could not create business."
+        err instanceof Error ? err.message : "Could not create business.",
       );
     } finally {
       setSaving(false);
@@ -41,88 +66,114 @@ export default function NewBusinessPage() {
   }
 
   return (
-    <main className="mx-auto max-w-xl space-y-6 p-6">
-      <Link href="/business" className="text-sm text-gray-500 hover:underline">
-        ← All businesses
-      </Link>
+    <>
+      <AppHeader />
 
-      <div>
-        <h1 className="text-2xl font-semibold">Create business</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Start with the basics. You can configure working hours later.
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="space-y-2">
-          <label htmlFor="name" className="text-sm font-medium">
-            Business name *
-          </label>
-          <input
-            id="name"
-            required
-            maxLength={100}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Downtown Salon"
-            className="w-full rounded-lg border px-3 py-2"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <label htmlFor="description" className="text-sm font-medium">
-            Description
-          </label>
-          <textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="What does your business do?"
-            rows={3}
-            className="w-full rounded-lg border px-3 py-2"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <label htmlFor="email" className="text-sm font-medium">
-            Contact email
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={contactEmail}
-            onChange={(e) => setContactEmail(e.target.value)}
-            className="w-full rounded-lg border px-3 py-2"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <label htmlFor="phone" className="text-sm font-medium">
-            Phone
-          </label>
-          <input
-            id="phone"
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className="w-full rounded-lg border px-3 py-2"
-          />
-        </div>
-
-        {error && (
-          <p role="alert" className="text-sm text-red-600">
-            {error}
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={saving}
-          className="w-full rounded-lg bg-black px-4 py-2.5 text-white disabled:opacity-50"
+      <main className="mx-auto max-w-xl px-4 py-8 sm:px-6">
+        <Link
+          href="/business"
+          className={cn(
+            "inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground",
+          )}
         >
-          {saving ? "Creating..." : "Create business"}
-        </button>
-      </form>
-    </main>
+          <HugeiconsIcon
+            icon={ArrowLeft01Icon}
+            strokeWidth={2}
+            className="size-4"
+          />
+          All businesses
+        </Link>
+
+        <div className="mt-4">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <HugeiconsIcon icon={Store01Icon} strokeWidth={2} className="size-5" />
+            </div>
+            <div>
+              <h1 className="font-heading text-2xl font-bold tracking-tight">
+                Create business
+              </h1>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                Start with the basics. You can configure working hours later.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Business details</CardTitle>
+            <CardDescription>
+              This information appears on your public QuiLess page.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+              <Field>
+                <FieldLabel htmlFor="name">
+                  Business name <span className="text-destructive">*</span>
+                </FieldLabel>
+                <Input
+                  id="name"
+                  required
+                  maxLength={100}
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="e.g. Downtown Salon"
+                />
+              </Field>
+
+              <Field>
+                <FieldLabel htmlFor="description">Description</FieldLabel>
+                <Textarea
+                  id="description"
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  placeholder="What does your business do?"
+                  rows={3}
+                />
+                <FieldDescription>
+                  Optional short summary shown on your public page.
+                </FieldDescription>
+              </Field>
+
+              <Field>
+                <FieldLabel htmlFor="email">Contact email</FieldLabel>
+                <Input
+                  id="email"
+                  type="email"
+                  value={contactEmail}
+                  onChange={(event) => setContactEmail(event.target.value)}
+                  placeholder="You@business.com"
+                />
+              </Field>
+
+              <Field>
+                <FieldLabel htmlFor="phone">Phone</FieldLabel>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  placeholder="+91 98765 43210"
+                />
+              </Field>
+
+              {error ? (
+                <Alert variant="destructive">
+                  <AlertTitle>Could not create business</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              ) : null}
+
+              <Button type="submit" disabled={saving} className="w-full">
+                {saving ? <Spinner data-icon="inline-start" /> : null}
+                {saving ? "Creating…" : "Create business"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </main>
+    </>
   );
 }

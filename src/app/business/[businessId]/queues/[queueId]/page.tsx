@@ -5,6 +5,39 @@ import { use, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/../convex/_generated/api";
 import type { Id } from "@/../convex/_generated/dataModel";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import { notifyError, notifyInfo, notifySuccess } from "@/lib/toast";
+import { ArrowLeft01Icon, Clock01Icon, Queue02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { cn } from "cn";
 
 type PageProps = {
   params: Promise<{
@@ -12,8 +45,6 @@ type PageProps = {
     queueId: string;
   }>;
 };
-
-const activeStatuses = ["waiting", "called", "checked_in", "serving"];
 
 function formatDate(timestamp: number) {
   return new Date(timestamp).toLocaleString("en-IN", {
@@ -24,6 +55,16 @@ function formatDate(timestamp: number) {
 
 function titleCase(value: string) {
   return value.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function statusVariant(status: string): "default" | "secondary" | "outline" {
+  if (status === "called" || status === "serving") {
+    return "secondary";
+  }
+  if (status === "checked_in") {
+    return "default";
+  }
+  return "outline";
 }
 
 export default function BusinessQueueOperationsPage({ params }: PageProps) {
@@ -50,8 +91,10 @@ export default function BusinessQueueOperationsPage({ params }: PageProps) {
   const skipToken = useMutation(api.business.queueCapacity.skipToken);
 
   const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [skipTarget, setSkipTarget] = useState<{
+    tokenId: Id<"queueTokens">;
+    tokenNumber: number;
+  } | null>(null);
 
   async function performAction(
     key: string,
@@ -59,14 +102,14 @@ export default function BusinessQueueOperationsPage({ params }: PageProps) {
     successMessage: string,
   ) {
     setBusyAction(key);
-    setError("");
-    setNotice("");
-
     try {
       await action();
-      setNotice(successMessage);
+      notifySuccess(successMessage);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "The operation failed.");
+      notifyError(
+        "Operation failed",
+        err instanceof Error ? err.message : "Please try again.",
+      );
     } finally {
       setBusyAction(null);
     }
@@ -74,40 +117,77 @@ export default function BusinessQueueOperationsPage({ params }: PageProps) {
 
   async function handleCallNext() {
     setBusyAction("call-next");
-    setError("");
-    setNotice("");
-
     try {
       const result = await callNext({ queueId: typedQueueId });
-
-      setNotice(
-        result
-          ? `Token #${result.tokenNumber} has been called.`
-          : "There are no waiting customers.",
-      );
+      if (result) {
+        notifySuccess(`Token #${result.tokenNumber} has been called.`);
+      } else {
+        notifyInfo("No waiting customers", "There are no waiting customers.");
+      }
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Could not call the next customer.",
+      notifyError(
+        "Could not call the next customer",
+        err instanceof Error ? err.message : "Please try again.",
       );
     } finally {
       setBusyAction(null);
     }
   }
 
+  function handleSkipConfirm() {
+    if (!skipTarget) {
+      return;
+    }
+    const { tokenId } = skipTarget;
+    setSkipTarget(null);
+    void performAction(
+      tokenId,
+      () =>
+        skipToken({
+          tokenId,
+        }),
+      `Token #${skipTarget.tokenNumber} skipped.`,
+    );
+  }
+
   if (queue === undefined || tokens === undefined || services === undefined) {
-    return <main className="p-6">Loading queue operations...</main>;
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-4 w-full max-w-xl" />
+        </div>
+        <Skeleton className="h-28 rounded-3xl" />
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-64 rounded-3xl" />
+      </div>
+    );
   }
 
   if (!queue || queue.businessId !== typedBusinessId) {
     return (
-      <main className="space-y-4 p-6">
-        <h1 className="text-2xl font-semibold">Queue not found</h1>
-        <Link href={`/business/${businessId}/queues`} className="underline">
+      <Empty className="justify-center py-24">
+        <EmptyContent>
+          <EmptyMedia variant="icon">
+            <HugeiconsIcon icon={Queue02Icon} strokeWidth={2} />
+          </EmptyMedia>
+          <EmptyTitle>Queue not found</EmptyTitle>
+          <EmptyDescription>
+            This queue may have been removed or the link is incorrect.
+          </EmptyDescription>
+        </EmptyContent>
+        <Link
+          href={`/business/${businessId}/queues`}
+          className={cn(buttonVariants({ size: "sm" }))}
+        >
+          <HugeiconsIcon
+            icon={ArrowLeft01Icon}
+            strokeWidth={2}
+            data-icon="inline-start"
+          />
           Return to queues
         </Link>
-      </main>
+      </Empty>
     );
   }
 
@@ -118,137 +198,152 @@ export default function BusinessQueueOperationsPage({ params }: PageProps) {
   const checkedIn = tokens.filter((token) => token.status === "checked_in");
   const serving = tokens.filter((token) => token.status === "serving");
 
+  const counts: Array<[string, number]> = [
+    ["Waiting", waiting.length],
+    ["Called", called.length],
+    ["Checked in", checkedIn.length],
+    ["Serving", serving.length],
+  ];
+
   return (
-    <main className="mx-auto max-w-6xl space-y-6 p-6">
-      <header className="space-y-2">
+    <div className="flex flex-col gap-6">
+      <div>
         <Link
           href={`/business/${businessId}/queues`}
-          className="text-sm text-gray-500 hover:underline"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
-          ← Queue management
+          <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} data-icon="inline-start" />
+          Queue management
         </Link>
 
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-semibold">{queue.name}</h1>
-            <p className="mt-2 text-gray-600">{queue.description}</p>
-            <p className="mt-2 text-sm text-gray-500">
+        <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="font-heading text-3xl font-bold tracking-tight">
+              {queue.name}
+            </h1>
+            <p className="mt-1 text-muted-foreground">{queue.description}</p>
+            <p className="mt-2 text-sm text-muted-foreground">
               Service: {service?.name ?? "Service unavailable"}
             </p>
           </div>
 
-          <span className="rounded-full border px-3 py-1 text-sm capitalize">
+          <Badge
+            variant={statusVariant(queue.status)}
+            className="h-5 rounded-full capitalize"
+          >
             {queue.status}
-          </span>
+          </Badge>
         </div>
-      </header>
-
-      {error && (
-        <p
-          role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-        >
-          {error}
-        </p>
-      )}
-
-      {notice && (
-        <p
-          role="status"
-          className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800"
-        >
-          {notice}
-        </p>
-      )}
+      </div>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          ["Waiting", waiting.length],
-          ["Called", called.length],
-          ["Checked in", checkedIn.length],
-          ["Serving", serving.length],
-        ].map(([label, count]) => (
-          <div key={label} className="rounded-xl border p-4">
-            <p className="text-sm text-gray-500">{label}</p>
-            <p className="mt-2 text-3xl font-semibold">{count}</p>
-          </div>
+        {counts.map(([label, count]) => (
+          <Card key={label}>
+            <CardHeader>
+              <CardTitle className="text-sm font-normal text-muted-foreground">
+                {label}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="font-heading text-3xl font-bold tracking-tight">
+                {count}
+              </p>
+            </CardContent>
+          </Card>
         ))}
       </section>
 
-      <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
-        <div>
-          <h2 className="font-semibold">Queue controls</h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Call the earliest waiting customer in this queue.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          disabled={
-            busyAction !== null ||
-            queue.status !== "active" ||
-            waiting.length === 0
-          }
-          onClick={handleCallNext}
-          className="rounded-lg bg-black px-4 py-2.5 text-sm text-white disabled:opacity-40"
-        >
-          {busyAction === "call-next" ? "Calling..." : "Call next customer"}
-        </button>
-      </section>
-
-      <section className="space-y-4">
-        <div>
-          <h2 className="text-xl font-semibold">Active tokens</h2>
-          <p className="mt-1 text-sm text-gray-500">
-            This list updates automatically when token statuses change.
-          </p>
-        </div>
-
-        {tokens.length === 0 ? (
-          <div className="rounded-xl border border-dashed p-8 text-center">
-            <p className="font-medium">No active tokens</p>
-            <p className="mt-2 text-sm text-gray-500">
-              Customers who join this queue will appear here.
-            </p>
+      <Card>
+        <CardHeader className="flex-row items-center justify-between gap-4">
+          <div className="grid gap-1">
+            <CardTitle>Queue controls</CardTitle>
+            <CardDescription>
+              Call the earliest waiting customer in this queue.
+            </CardDescription>
           </div>
-        ) : (
-          <div className="space-y-3">
-            {tokens.map((token) => (
-              <article key={token._id} className="rounded-xl border p-4">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <h3 className="text-lg font-semibold">
+          <Button
+            disabled={
+              busyAction !== null ||
+              queue.status !== "active" ||
+              waiting.length === 0
+            }
+            onClick={handleCallNext}
+          >
+            {busyAction === "call-next" ? (
+              <Spinner data-icon="inline-start" />
+            ) : null}
+            {busyAction === "call-next"
+              ? "Calling…"
+              : "Call next customer"}
+          </Button>
+        </CardHeader>
+      </Card>
+
+      <div>
+        <h2 className="font-heading text-xl font-bold tracking-tight">
+          Active tokens
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          This list updates automatically when token statuses change.
+        </p>
+      </div>
+
+      {tokens.length === 0 ? (
+        <Empty className="border-dashed">
+          <EmptyContent>
+            <EmptyMedia variant="icon">
+              <HugeiconsIcon icon={Clock01Icon} strokeWidth={2} />
+            </EmptyMedia>
+            <EmptyTitle>No active tokens</EmptyTitle>
+            <EmptyDescription>
+              Customers who join this queue will appear here.
+            </EmptyDescription>
+          </EmptyContent>
+        </Empty>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {tokens.map((token) => (
+            <Card key={token._id} size="sm">
+              <CardContent className="gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="font-heading text-lg font-bold tracking-tight">
                       Token #{token.tokenNumber}
                     </h3>
-                    <p className="mt-1 text-sm text-gray-500">
+                    <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <HugeiconsIcon icon={Clock01Icon} strokeWidth={2} data-icon="inline-start" />
                       Joined {formatDate(token.joinedAt)}
                     </p>
 
-                    {token.customerNote && (
-                      <p className="mt-2 text-sm">Note: {token.customerNote}</p>
-                    )}
+                    {token.customerNote ? (
+                      <p className="mt-2 text-sm">
+                        Note: {token.customerNote}
+                      </p>
+                    ) : null}
 
                     {token.graceDeadlineAt !== undefined &&
-                      token.status === "called" && (
-                        <p className="mt-2 text-sm text-amber-700">
-                          Check-in deadline: {formatDate(token.graceDeadlineAt)}
-                        </p>
-                      )}
+                      token.status === "called" ? (
+                      <p className="mt-2 text-sm text-amber-600 dark:text-amber-500">
+                        Check-in deadline: {formatDate(token.graceDeadlineAt)}
+                      </p>
+                    ) : null}
                   </div>
 
-                  <span className="rounded-full bg-gray-100 px-3 py-1 text-sm">
+                  <Badge
+                    variant={statusVariant(token.status)}
+                    className="h-5 rounded-full capitalize"
+                  >
                     {titleCase(token.status)}
-                  </span>
+                  </Badge>
                 </div>
 
-                <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
-                  {token.status === "checked_in" && (
-                    <button
-                      type="button"
+                <div className="flex flex-wrap gap-2 border-t pt-3">
+                  {token.status === "checked_in" ? (
+                    <Button
+                      size="sm"
                       disabled={busyAction !== null}
                       onClick={() =>
-                        performAction(
+                        void performAction(
                           token._id,
                           () =>
                             startServing({
@@ -257,20 +352,22 @@ export default function BusinessQueueOperationsPage({ params }: PageProps) {
                           `Service started for token #${token.tokenNumber}.`,
                         )
                       }
-                      className="rounded-lg bg-black px-3 py-2 text-sm text-white disabled:opacity-40"
                     >
+                      {busyAction === token._id ? (
+                        <Spinner data-icon="inline-start" />
+                      ) : null}
                       {busyAction === token._id
-                        ? "Processing..."
+                        ? "Processing…"
                         : "Start service"}
-                    </button>
-                  )}
+                    </Button>
+                  ) : null}
 
-                  {token.status === "serving" && (
-                    <button
-                      type="button"
+                  {token.status === "serving" ? (
+                    <Button
+                      size="sm"
                       disabled={busyAction !== null}
                       onClick={() =>
-                        performAction(
+                        void performAction(
                           token._id,
                           () =>
                             completeToken({
@@ -279,47 +376,68 @@ export default function BusinessQueueOperationsPage({ params }: PageProps) {
                           `Token #${token.tokenNumber} completed.`,
                         )
                       }
-                      className="rounded-lg bg-black px-3 py-2 text-sm text-white disabled:opacity-40"
                     >
+                      {busyAction === token._id ? (
+                        <Spinner data-icon="inline-start" />
+                      ) : null}
                       {busyAction === token._id
-                        ? "Processing..."
+                        ? "Processing…"
                         : "Complete service"}
-                    </button>
-                  )}
+                    </Button>
+                  ) : null}
 
                   {["waiting", "called", "checked_in"].includes(
                     token.status,
-                  ) && (
-                    <button
-                      type="button"
+                  ) ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                       disabled={busyAction !== null}
-                      onClick={() => {
-                        if (
-                          !window.confirm(`Skip token #${token.tokenNumber}?`)
-                        ) {
-                          return;
-                        }
-
-                        void performAction(
-                          token._id,
-                          () =>
-                            skipToken({
-                              tokenId: token._id,
-                            }),
-                          `Token #${token.tokenNumber} skipped.`,
-                        );
-                      }}
-                      className="rounded-lg border border-red-200 px-3 py-2 text-sm text-red-700 disabled:opacity-40"
+                      onClick={() =>
+                        setSkipTarget({
+                          tokenId: token._id,
+                          tokenNumber: token.tokenNumber,
+                        })
+                      }
                     >
                       Skip token
-                    </button>
-                  )}
+                    </Button>
+                  ) : null}
                 </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
-    </main>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <AlertDialog
+        open={skipTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSkipTarget(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogMedia>
+              <HugeiconsIcon icon={Clock01Icon} strokeWidth={2} />
+            </AlertDialogMedia>
+            <AlertDialogTitle>Skip token #{skipTarget?.tokenNumber}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The customer will be moved out of the active queue. This cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleSkipConfirm}>
+              Skip token
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }
