@@ -1,10 +1,23 @@
-
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthActions } from "@convex-dev/auth/react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 
 type AuthFormProps = {
   mode: "signIn" | "signUp";
@@ -29,8 +42,6 @@ export default function AuthForm({ mode }: AuthFormProps) {
     setLoading(true);
 
     try {
-
-      console.log("Signing in with email:", email, "and password:", password);
       await signIn("password", {
         email: email.trim(),
         password,
@@ -41,7 +52,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
     } catch (err) {
       setError(
         err instanceof Error
-          ? err.stack ?? err.message
+          ? err.message
           : "Authentication failed. Please try again."
       );
     } finally {
@@ -50,100 +61,86 @@ export default function AuthForm({ mode }: AuthFormProps) {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-        <Link
-          href="/"
-          className="text-sm font-semibold text-blue-700"
-        >
-          ← Quiskip
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
+      <div className="w-full max-w-md">
+        <Link href="/" className="text-sm font-semibold text-primary">
+          ← QuiLess
         </Link>
 
-        <h1 className="mt-8 text-3xl font-bold tracking-tight text-slate-900">
-          {isSignUp ? "Create your account" : "Welcome back"}
-        </h1>
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>
+              {isSignUp ? "Create your account" : "Welcome back"}
+            </CardTitle>
+            <CardDescription>
+              {isSignUp
+                ? "Create your QuiLess account to get started."
+                : "Sign in to manage your QuiLess account."}
+            </CardDescription>
+          </CardHeader>
 
-        <p className="mt-2 text-sm text-slate-600">
-          {isSignUp
-            ? "Create your Quiskip account to get started."
-            : "Sign in to manage your Quiskip account."}
-        </p>
+          <form onSubmit={handleSubmit}>
+            <CardContent className="flex flex-col gap-6">
+              <FieldGroup className="gap-5">
+                <Field>
+                  <FieldLabel htmlFor="email">Email address</FieldLabel>
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="you@example.com"
+                  />
+                </Field>
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-          <div>
-            <label
-              htmlFor="email"
-              className="mb-2 block text-sm font-medium text-slate-700"
-            >
-              Email address
-            </label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-              placeholder="you@example.com"
-            />
-          </div>
+                <Field>
+                  <FieldLabel htmlFor="password">Password</FieldLabel>
+                  <Input
+                    id="password"
+                    type="password"
+                    autoComplete={
+                      isSignUp ? "new-password" : "current-password"
+                    }
+                    minLength={8}
+                    required
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="At least 8 characters"
+                  />
+                </Field>
+              </FieldGroup>
 
-          <div>
-            <label
-              htmlFor="password"
-              className="mb-2 block text-sm font-medium text-slate-700"
-            >
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete={
-                isSignUp ? "new-password" : "current-password"
-              }
-              minLength={8}
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-              placeholder="At least 8 characters"
-            />
-          </div>
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
 
-          {error && (
-            <p
-              role="alert"
-              className="rounded-lg bg-red-50 p-3 text-sm text-red-700"
-            >
-              {error}
+              <Button type="submit" disabled={loading} className="w-full">
+                {loading && <Spinner data-icon="inline-start" />}
+                {loading
+                  ? "Please wait..."
+                  : isSignUp
+                    ? "Create account"
+                    : "Sign in"}
+              </Button>
+            </CardContent>
+          </form>
+
+          <CardFooter className="justify-center">
+            <p className="text-sm text-muted-foreground">
+              {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
+              <Link
+                href={isSignUp ? "/sign-in" : "/sign-up"}
+                className="font-semibold text-primary hover:underline"
+              >
+                {isSignUp ? "Sign in" : "Sign up"}
+              </Link>
             </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-blue-700 px-4 py-3 font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {loading
-              ? "Please wait..."
-              : isSignUp
-                ? "Create account"
-                : "Sign in"}
-          </button>
-        </form>
-
-        <p className="mt-6 text-center text-sm text-slate-600">
-          {isSignUp
-            ? "Already have an account?"
-            : "Don't have an account?"}{" "}
-          <Link
-            href={isSignUp ? "/sign-in" : "/sign-up"}
-            className="font-semibold text-blue-700 hover:underline"
-          >
-            {isSignUp ? "Sign in" : "Sign up"}
-          </Link>
-        </p>
+          </CardFooter>
+        </Card>
       </div>
     </main>
   );
