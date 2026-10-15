@@ -19,7 +19,10 @@ import { ScanBusinessButton } from "@/components/business/scan-business-button";
 import { BusinessSearchFilters } from "@/components/business/business-search-filters";
 import { useBusinessSearch } from "@/hooks/use-business-search";
 import { businessTypeLabel } from "@/lib/business-type";
-import { EMPTY_FILTERS, type BusinessSearchFilters as BusinessFilters } from "@/lib/business-search";
+import {
+  EMPTY_FILTERS,
+  type BusinessSearchFilters as BusinessFilters,
+} from "@/lib/business-search";
 import type { PublicBusinessRow } from "@/../convex/business/data";
 import {
   ArrowRight01Icon,
@@ -70,7 +73,11 @@ function BusinessCard({ business }: { business: PublicBusinessRow }) {
 
         <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-4">
           <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-            <HugeiconsIcon icon={Mail01Icon} strokeWidth={2} className="size-3.5 shrink-0" />
+            <HugeiconsIcon
+              icon={Mail01Icon}
+              strokeWidth={2}
+              className="size-3.5 shrink-0"
+            />
             <span className="truncate">
               {business.contactEmail ?? "No contact email"}
             </span>
@@ -120,11 +127,9 @@ function BusinessCardSkeleton() {
 
 export default function CustomerHomePage() {
   const [filters, setFilters] = useState<BusinessFilters>(EMPTY_FILTERS);
-  const { results, status, total, loadMore } =
-    useBusinessSearch(filters);
+  const { results, status, total, loadMore } = useBusinessSearch(filters);
 
-  const firstPageLoading =
-    status === "LoadingFirstPage";
+  const firstPageLoading = status === "LoadingFirstPage";
   const loadingMore = status === "LoadingMore";
   const exhausted = status === "Exhausted";
   const showLoadMore = status === "CanLoadMore" || loadingMore;
@@ -159,13 +164,13 @@ export default function CustomerHomePage() {
             nearby. Open a business to join its queue or book an appointment.
           </p>
 
-          <BusinessSearchFilters
-            filters={filters}
-            onChange={updateFilters}
-          />
+          <BusinessSearchFilters filters={filters} onChange={updateFilters} />
 
           <div className="flex flex-wrap items-center gap-3">
-            <Link href={mapHref} className={cn(buttonVariants({ variant: "outline" }))}>
+            <Link
+              href={mapHref}
+              className={cn(buttonVariants({ variant: "outline" }))}
+            >
               <HugeiconsIcon
                 icon={Location01Icon}
                 strokeWidth={2}
@@ -202,9 +207,7 @@ export default function CustomerHomePage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() =>
-                    updateFilters({ center: null })
-                  }
+                  onClick={() => updateFilters({ center: null })}
                 >
                   Clear location filter
                 </Button>
@@ -213,9 +216,7 @@ export default function CustomerHomePage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() =>
-                    updateFilters({ keyword: "", type: "all" })
-                  }
+                  onClick={() => updateFilters({ keyword: "", type: "all" })}
                 >
                   Clear search
                 </Button>
@@ -233,16 +234,19 @@ export default function CustomerHomePage() {
 
           <div className="mt-8 flex flex-col items-center gap-2">
             {showLoadMore ? (
-              <Button type="button" variant="outline" onClick={() => loadMore(8)} disabled={loadingMore}>
-                {loadingMore ? (
-                  <Spinner data-icon="inline-start" />
-                ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => loadMore(8)}
+                disabled={loadingMore}
+              >
+                {loadingMore ? <Spinner data-icon="inline-start" /> : null}
                 {loadingMore ? "Loading…" : "Load more businesses"}
               </Button>
             ) : exhausted && total !== undefined ? (
               <p className="text-sm text-muted-foreground">
-                Showing all {total >= 1000 ? "1000+ of " : total}{" "}
-                matching {total === 1 ? "business" : "businesses"}.
+                Showing all {total >= 1000 ? "1000+ of " : total} matching{" "}
+                {total === 1 ? "business" : "businesses"}.
               </p>
             ) : null}
           </div>
