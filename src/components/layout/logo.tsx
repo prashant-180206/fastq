@@ -12,7 +12,7 @@ export function Logo({ href = "/", className }: LogoProps) {
       href={href}
       className={cn("text-xl font-bold tracking-tight", className)}
     >
-      QuiLess<span className="text-primary">.</span>
+      FastQ<span className="text-primary">.</span>
     </Link>
   );
 }
