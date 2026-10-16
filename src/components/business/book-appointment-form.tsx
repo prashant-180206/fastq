@@ -174,7 +174,7 @@ export function BookAppointmentForm({
             <EmptyTitle>Business unavailable</EmptyTitle>
             <EmptyDescription>
               This business may not exist or may no longer be available on
-              QuiLess.
+              FastQ.
             </EmptyDescription>
           </EmptyContent>
         </Empty>

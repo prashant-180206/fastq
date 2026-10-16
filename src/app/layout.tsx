@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 const figtree = Figtree({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
-  title: "QuiLess",
+  title: "FastQ",
   description: "Queue and appointment management made simple.",
 };
 

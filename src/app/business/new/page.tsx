@@ -172,7 +172,7 @@ export default function NewBusinessPage() {
           <CardHeader>
             <CardTitle>Business details</CardTitle>
             <CardDescription>
-              This information appears on your public QuiLess page.
+              This information appears on your public FastQ page.
             </CardDescription>
           </CardHeader>
           <CardContent>

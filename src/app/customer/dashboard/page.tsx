@@ -95,7 +95,7 @@ export default function CustomerDashboardPage() {
     <div className="flex flex-col gap-8">
       <div>
         <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-          QuiLess customer account
+          FastQ customer account
         </p>
         <h1 className="mt-1 font-heading text-3xl font-bold tracking-tight">
           Your dashboard

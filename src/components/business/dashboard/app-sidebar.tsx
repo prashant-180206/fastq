@@ -62,7 +62,7 @@ export function AppSidebar({ businessId }: AppSidebarProps) {
                 </span>
               </div>
               <span className="truncate text-base font-bold tracking-tight">
-                QuiLess<span className="text-primary">.</span>
+                FastQ<span className="text-primary">.</span>
               </span>
             </SidebarMenuButton>
           </SidebarMenuItem>

@@ -64,7 +64,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-md">
         <Link href="/" className="text-sm font-semibold text-primary">
-          ← QuiLess
+          ← FastQ
         </Link>
 
         <Card className="mt-6">
@@ -74,8 +74,8 @@ export default function AuthForm({ mode }: AuthFormProps) {
             </CardTitle>
             <CardDescription>
               {isSignUp
-                ? "Create your QuiLess account to get started."
-                : "Sign in to manage your QuiLess account."}
+                ? "Create your FastQ account to get started."
+                : "Sign in to manage your FastQ account."}
             </CardDescription>
           </CardHeader>
 

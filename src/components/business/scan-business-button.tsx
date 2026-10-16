@@ -39,7 +39,7 @@ export function ScanBusinessButton() {
       const businessId = parseBusinessId(value);
 
       if (!businessId) {
-        notifyError("That QR code does not point to a QuiLess business.");
+        notifyError("That QR code does not point to a FastQ business.");
         return;
       }
 

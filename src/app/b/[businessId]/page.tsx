@@ -77,7 +77,7 @@ export default function PublicBusinessPage() {
             <EmptyTitle>Business unavailable</EmptyTitle>
             <EmptyDescription>
               This business may not exist or may no longer be available on
-              QuiLess.
+              FastQ.
             </EmptyDescription>
             <Link
               href="/customer"
