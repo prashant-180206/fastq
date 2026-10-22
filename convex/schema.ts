@@ -236,4 +236,25 @@ export default defineSchema({
     .index("by_business_and_joined_at", ["businessId", "joinedAt"])
     .index("by_status_and_grace_deadline", ["status", "graceDeadlineAt"])
     .index("by_status_and_expiry", ["status", "expiresAt"]),
+
+  broadcasts: defineTable({
+    // Business that published the announcement.
+    businessId: v.id("businesses"),
+
+    // When set, only customers in this queue see it. When omitted, it targets
+    // every queue managed by the business.
+    queueId: v.optional(v.id("queues")),
+
+    message: v.string(),
+
+    // Business owner who published the announcement.
+    createdBy: v.id("users"),
+
+    createdAt: v.number(),
+
+    // Customers only receive the broadcast while `expiresAt > now`.
+    expiresAt: v.number(),
+  })
+    .index("by_business_and_expiry", ["businessId", "expiresAt"])
+    .index("by_expires_at", ["expiresAt"]),
 });

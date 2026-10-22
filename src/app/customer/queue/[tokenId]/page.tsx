@@ -19,7 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Empty,
   EmptyContent,
@@ -29,12 +29,14 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { useNow } from "@/hooks/use-now";
 import { formatDateTimeIST } from "@/lib/format";
 import { notifyError, notifySuccess } from "@/lib/toast";
 import { PageHeader } from "@/components/customer/page-header";
 import {
   Cancel01Icon,
   CheckmarkCircle01Icon,
+  Megaphone01Icon,
   Queue02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -83,6 +85,12 @@ export default function CustomerQueueTokenPage({ params }: PageProps) {
     tokenId: tokenIdRef,
   });
   const businesses = useQuery(api.business.data.getAll, {});
+
+  const now = useNow(30_000);
+  const broadcasts = useQuery(api.business.broadcasts.getActiveForToken, {
+    tokenId: tokenIdRef,
+    now,
+  });
 
   const checkIn = useMutation(api.business.queueCapacity.checkInToken);
   const cancel = useMutation(api.business.queueCapacity.cancelToken);
@@ -321,6 +329,36 @@ export default function CustomerQueueTokenPage({ params }: PageProps) {
           )}
         </CardContent>
       </Card>
+
+      {broadcasts && broadcasts.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <HugeiconsIcon
+                icon={Megaphone01Icon}
+                strokeWidth={2}
+                className="size-5 text-primary"
+              />
+              Announcements
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            {broadcasts.map((broadcast) => (
+              <div
+                key={broadcast._id}
+                className="rounded-lg border border-primary/20 bg-primary/5 p-3"
+              >
+                <p className="whitespace-pre-wrap text-sm">
+                  {broadcast.message}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Until {formatDateTimeIST(broadcast.expiresAt)}
+                </p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {business && (
         <Card size="sm">

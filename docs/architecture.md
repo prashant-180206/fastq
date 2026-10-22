@@ -52,3 +52,7 @@ Next 16 with `experimental.cacheComponents` rejects clock access during static p
 ## Realtime behaviour
 
 Convex queries are live: queue status, token lifecycle, appointment status, and business schedules update in all open clients the moment a mutation commits. Backend functions enforce authorization (see `convex/lib/authorization.ts`) and atomic transitions — clients never compute authoritative state.
+
+## Diagrams
+
+Technology-agnostic system, flow, and data diagrams (PlantUML source) live in [diagrams.md](diagrams.md).

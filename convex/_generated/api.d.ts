@@ -10,11 +10,13 @@
 
 import type * as auth from "../auth.js";
 import type * as business_appointments from "../business/appointments.js";
+import type * as business_broadcasts from "../business/broadcasts.js";
 import type * as business_data from "../business/data.js";
 import type * as business_migrations from "../business/migrations.js";
 import type * as business_queue from "../business/queue.js";
 import type * as business_queueCapacity from "../business/queueCapacity.js";
 import type * as business_services from "../business/services.js";
+import type * as crons from "../crons.js";
 import type * as http from "../http.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_authorization from "../lib/authorization.js";
@@ -30,11 +32,13 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   "business/appointments": typeof business_appointments;
+  "business/broadcasts": typeof business_broadcasts;
   "business/data": typeof business_data;
   "business/migrations": typeof business_migrations;
   "business/queue": typeof business_queue;
   "business/queueCapacity": typeof business_queueCapacity;
   "business/services": typeof business_services;
+  crons: typeof crons;
   http: typeof http;
   "lib/auth": typeof lib_auth;
   "lib/authorization": typeof lib_authorization;

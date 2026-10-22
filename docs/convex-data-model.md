@@ -32,6 +32,12 @@ Schema lives in `convex/schema.ts` (`defineSchema`). Auth tables (`authTables`) 
 - `businessId`, `queueId`, `serviceId`, `customerId`, `tokenNumber`; status (`waiting`, `called`, `checked_in`, `serving`, `completed`, cancelled/skipped/expired/no-show); timing fields per transition; `gracePeriodMinutes` + `graceDeadlineAt` (snapshot at creation), `expiresAt` (hard validity), `estimatedWaitMinutes`, `customerNote`, `acknowledgedPrerequisites` snapshot.
 - Indexes: `by_queue`, `by_queue_and_status`, `by_queue_and_token_number`, `by_customer`, `by_customer_and_status`, `by_business_and_joined_at`, `by_status_and_grace_deadline`, `by_status_and_expiry` (used by expiry sweeps).
 
+### broadcasts
+- Business announcements shown to customers in the queue.
+- `businessId`, optional `queueId` (omit for every queue of the business), `message` (≤ 500 chars), `createdBy` (owner), `createdAt`, `expiresAt`.
+- Delivered only while `expiresAt > now`; owners can stop one early.
+- Indexes: `by_business_and_expiry`, `by_expires_at` (used by cleanup).
+
 ## Business functions
 
 Backend functions live in `convex/business/*.ts`. Shared authorization helpers are in `convex/lib/`.
@@ -54,6 +60,18 @@ Backend functions live in `convex/business/*.ts`. Shared authorization helpers a
 
 ### appointments.ts
 `getAvailableSlots`, `book`, `getMyAppointments`, `getByBusiness`, `cancel`, `checkIn`, `complete`, `markNoShow`, `getMyAppointmentById`.
+
+### broadcasts.ts
+- `create` (owner): publish an announcement with an expiry (1–1440 minutes); optional `queueId`.
+- `remove` (owner): stop an announcement early.
+- `getActiveByQueue` (owner) / `getActiveForToken` (customer): non-expired announcements; both accept `now` (queries never read the wall clock).
+- Business-wide announcements (`queueId` unset) match every queue.
+
+## Scheduled cleanup
+
+`convex/crons.ts` runs daily:
+- `deleteOldQueueTokens` — removes `queueTokens` older than 7 days in bounded batches (200/run), scheduling a continuation.
+- `deleteExpiredBroadcasts` — removes broadcasts that expired more than a day ago.
 
 ## Reading customer records
 

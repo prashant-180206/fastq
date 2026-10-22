@@ -231,7 +231,7 @@ export function JoinQueueForm({
 
             <div className="flex flex-wrap items-center justify-center gap-3">
               <Link
-                href="/my-day"
+                href={`/customer/queue/${success.tokenId}`}
                 className={cn(buttonVariants())}
               >
                 View my day

@@ -32,12 +32,30 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
+import { useNow } from "@/hooks/use-now";
+import { formatDateTimeIST } from "@/lib/format";
 import { notifyError, notifyInfo, notifySuccess } from "@/lib/toast";
-import { ArrowLeft01Icon, Clock01Icon, Queue02Icon } from "@hugeicons/core-free-icons";
+import {
+  ArrowLeft01Icon,
+  Clock01Icon,
+  Megaphone01Icon,
+  Queue02Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "cn";
+
+const BROADCAST_TTL_OPTIONS = [15, 30, 60, 240] as const;
+const DEFAULT_BROADCAST_TTL = 30;
 
 type PageProps = {
   params: Promise<{
@@ -90,7 +108,22 @@ export default function BusinessQueueOperationsPage({ params }: PageProps) {
   const completeToken = useMutation(api.business.queueCapacity.completeToken);
   const skipToken = useMutation(api.business.queueCapacity.skipToken);
 
+  const now = useNow(30_000);
+
+  const broadcasts = useQuery(api.business.broadcasts.getActiveByQueue, {
+    queueId: typedQueueId,
+    now,
+  });
+
+  const createBroadcast = useMutation(api.business.broadcasts.create);
+  const removeBroadcast = useMutation(api.business.broadcasts.remove);
+
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [broadcastMessage, setBroadcastMessage] = useState("");
+  const [broadcastMinutes, setBroadcastMinutes] = useState<number>(
+    DEFAULT_BROADCAST_TTL,
+  );
+  const [sendingBroadcast, setSendingBroadcast] = useState(false);
   const [skipTarget, setSkipTarget] = useState<{
     tokenId: Id<"queueTokens">;
     tokenNumber: number;
@@ -148,6 +181,32 @@ export default function BusinessQueueOperationsPage({ params }: PageProps) {
         }),
       `Token #${skipTarget.tokenNumber} skipped.`,
     );
+  }
+
+  async function handleBroadcast() {
+    const message = broadcastMessage.trim();
+    if (!message) {
+      return;
+    }
+
+    setSendingBroadcast(true);
+    try {
+      await createBroadcast({
+        businessId: typedBusinessId,
+        queueId: typedQueueId,
+        message,
+        expiresInMinutes: broadcastMinutes,
+      });
+      setBroadcastMessage("");
+      notifySuccess("Announcement sent to everyone in the queue.");
+    } catch (err) {
+      notifyError(
+        "Could not send the announcement",
+        err instanceof Error ? err.message : "Please try again.",
+      );
+    } finally {
+      setSendingBroadcast(false);
+    }
   }
 
   if (queue === undefined || tokens === undefined || services === undefined) {
@@ -278,6 +337,117 @@ export default function BusinessQueueOperationsPage({ params }: PageProps) {
           </Button>
         </CardHeader>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <HugeiconsIcon
+              icon={Megaphone01Icon}
+              strokeWidth={2}
+              className="size-5 text-primary"
+            />
+            Broadcast an announcement
+          </CardTitle>
+          <CardDescription>
+            Send a short message to every customer currently in this queue. It
+            disappears automatically when it expires.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <Textarea
+            value={broadcastMessage}
+            onChange={(event) => setBroadcastMessage(event.target.value)}
+            maxLength={500}
+            rows={3}
+            placeholder="e.g. Our card machine is down — please carry cash."
+            aria-label="Announcement message"
+          />
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Select
+              value={String(broadcastMinutes)}
+              onValueChange={(value) =>
+                setBroadcastMinutes(Number(value ?? DEFAULT_BROADCAST_TTL))
+              }
+            >
+              <SelectTrigger
+                aria-label="Announcement duration"
+                className="w-40"
+              >
+                <SelectValue>{`${broadcastMinutes} min`}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {BROADCAST_TTL_OPTIONS.map((minutes) => (
+                  <SelectItem key={minutes} value={String(minutes)}>
+                    {minutes >= 60 ? `${minutes / 60} hr` : `${minutes} min`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Button
+              disabled={
+                sendingBroadcast || broadcastMessage.trim().length === 0
+              }
+              onClick={handleBroadcast}
+            >
+              {sendingBroadcast ? <Spinner data-icon="inline-start" /> : null}
+              {sendingBroadcast ? "Sending…" : "Send announcement"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {broadcasts && broadcasts.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Active announcements</CardTitle>
+            <CardDescription>
+              Visible to customers in this queue until they expire.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            {broadcasts.map((broadcast) => (
+              <div
+                key={broadcast._id}
+                className="flex flex-wrap items-start justify-between gap-3 rounded-xl border p-3"
+              >
+                <div className="min-w-0">
+                  <p className="whitespace-pre-wrap text-sm">
+                    {broadcast.message}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Expires {formatDateTimeIST(broadcast.expiresAt)}
+                    {broadcast.queueId === undefined
+                      ? " · all queues"
+                      : ""}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={busyAction !== null}
+                  onClick={() =>
+                    void performAction(
+                      broadcast._id,
+                      () =>
+                        removeBroadcast({
+                          broadcastId: broadcast._id,
+                        }),
+                      "Announcement stopped.",
+                    )
+                  }
+                >
+                  {busyAction === broadcast._id ? (
+                    <Spinner data-icon="inline-start" />
+                  ) : null}
+                  Stop
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div>
         <h2 className="font-heading text-xl font-bold tracking-tight">

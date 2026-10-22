@@ -199,6 +199,13 @@
       "skillPath": "skills/convex-verify/SKILL.md",
       "computedHash": "dbe65a37ca2e9a5afa55669b8928ce1dc3ac765151452008f9105bde049228f7"
     },
+    "plantuml": {
+      "source": "smithery.ai",
+      "sourceUrl": "https://smithery.ai/skills/SpillwaveSolutions/plantuml",
+      "sourceType": "well-known",
+      "computedHash": "b822aefc201abe754609a683c4c5be783ed4114dcb3781cdd31b4d9c37174d1a",
+      "wellKnownDigest": "sha256:282d75ea3bba3ba0957b9adca773778f387f4bec948940609b6bd8650df2f570"
+    },
     "shadcn": {
       "source": "shadcn/ui",
       "sourceType": "github",

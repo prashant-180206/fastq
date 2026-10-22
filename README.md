@@ -1,4 +1,4 @@
-# QuiLess
+# FastQ
 
 Skip the wait. QuiLess lets businesses run **queues** and **appointments** in one place, and lets customers join a queue or book a slot in a few taps — from QR code to check-in.
 
